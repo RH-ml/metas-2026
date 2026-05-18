@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Preview — Tela de Login | ML Metas</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@typehaus/metropolis@12.0.0/400.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@typehaus/metropolis@12.0.0/500.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@typehaus/metropolis@12.0.0/600.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@typehaus/metropolis@12.0.0/700.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@typehaus/metropolis@12.0.0/800.css">
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Metropolis', 'Inter', sans-serif; background: #0f171e; color: #e8ebe9; }
+  </style>
+</head>
+<body>
+  <div class="login-page">
+    <div class="login-image-side">
+      <img src="img/login-bg.jpg" alt="Empreendimento Moura Leite" onerror="this.style.display='none'; this.parentElement.style.background='linear-gradient(135deg, #1a2332, #0f171e)';">
+      <div class="login-image-overlay"></div>
+      <div class="login-image-caption">
+        <h2>Moura Leite</h2>
+        <p>Transformando lugares em histórias de vida.</p>
+      </div>
+    </div>
+    <div class="login-form-side">
+      <div class="login-card">
+        <div class="login-brand">
+          <img src="img/Novo-logo.png" style="width: 52px; height: 52px; object-fit: contain;" alt="Moura Leite Logo">
+          <h1 class="login-title">ML Metas</h1>
+          <p class="login-subtitle">Gestão de Metas & Remuneração Variável</p>
+        </div>
+        <form class="login-form" onsubmit="event.preventDefault(); alert('Login funcionaria aqui!');">
+          <div class="form-group">
+            <label class="form-label" for="loginEmail">E-mail</label>
+            <input type="email" id="loginEmail" class="form-input" placeholder="seu@email.com" value="admin@empresa.com" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="loginSenha">Senha</label>
+            <input type="password" id="loginSenha" class="form-input" placeholder="••••••" value="admin" required>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">Entrar</button>
+        </form>
+        <p class="login-hint">Use <strong>admin@empresa.com</strong> / <strong>admin</strong></p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
