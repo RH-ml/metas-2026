@@ -7,19 +7,26 @@ const App = {
 
   init() {
     DataStore.init();
-    if (!Auth.isLoggedIn()) {
-      Auth.login('admin@empresa.com', 'admin');
-    }
     window.addEventListener('hashchange', () => this.handleRoute());
     this.handleRoute();
   },
 
   handleRoute() {
+    const isLoggedIn = Auth.isLoggedIn();
     const hash = window.location.hash.replace('#', '') || 'dashboard';
 
-    if (hash === 'login') {
-      this.navigate('dashboard');
-      return;
+    if (!isLoggedIn) {
+      // Se não estiver logado, obriga a ir para a tela de login
+      if (hash !== 'login') {
+        this.navigate('login');
+        return;
+      }
+    } else {
+      // Se já estiver logado e tentar acessar a tela de login, redireciona para o dashboard
+      if (hash === 'login') {
+        this.navigate('dashboard');
+        return;
+      }
     }
 
     this.currentRoute = hash;
