@@ -329,7 +329,7 @@ const Metas = {
                     <td style="padding: 12px; font-size: 0.85rem; font-weight: 600; color: var(--text-1);">${a.titulo}</td>
                     <td style="padding: 12px; font-size: 0.8rem; color: var(--text-2);">
                       ${a.descricao || 'Sem descrição'}
-                      ${a.anexo ? `<br><span style="font-size: 0.7rem; color: var(--success);">📎 ${a.anexo.nome}</span>` : ''}
+                      ${a.anexo ? `<br>${a.anexo.url ? `<a href="${a.anexo.url}" target="_blank" style="font-size: 0.7rem; color: var(--success); text-decoration: underline; display: inline-flex; align-items: center; gap: 3px;">📎 ${a.anexo.nome}</a>` : `<span style="font-size: 0.7rem; color: var(--success);">📎 ${a.anexo.nome}</span>`}` : ''}
                     </td>
                     <td style="padding: 12px; text-align: center;"><span id="acao-status-${a.id}">${Components.badge(statusAuto, statusAuto)}</span></td>
                     <td style="padding: 12px; text-align: center;">
@@ -986,10 +986,45 @@ const Metas = {
   openAnexoForm(metaId, mes) {
     Components.closeModal();
     
+    const meta = DataStore.getMetaById(metaId);
+    let currentAnexos = [];
+    if (meta && meta.mesesData) {
+      const monthObj = meta.mesesData.find(x => x.mes === mes);
+      if (monthObj && monthObj.anexos) {
+        currentAnexos = monthObj.anexos;
+      }
+    }
+
+    const session = Auth.getSession();
+    const isAdmin = session?.nivel === 'Admin';
+    const isOwner = session?.id === meta?.responsavelId;
+
+    let listHtml = '';
+    if (currentAnexos.length > 0) {
+      listHtml = `
+        <div style="margin-bottom: 20px;">
+          <div style="font-size: 0.75rem; color: var(--text-3); font-weight: 600; text-transform: uppercase; margin-bottom: 8px;">Evidências Anexadas</div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            ${currentAnexos.map((anexo, aIdx) => `
+              <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-3); padding:8px 12px; border-radius:var(--radius-xs); border: 1px solid rgba(255,255,255,0.05);">
+                <span style="font-size:0.8rem; color:var(--text-1); font-weight:500;">📎 ${anexo.nome}</span>
+                <div style="display:flex; gap:6px;">
+                  ${anexo.url ? `<a href="${anexo.url}" target="_blank" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:0.75rem; color:var(--primary); text-decoration:none;">Visualizar</a>` : ''}
+                  ${(isAdmin || isOwner) ? `<button type="button" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:0.75rem; color:var(--danger);" onclick="Metas.deleteAnexo('${metaId}', '${mes}', ${aIdx})">Excluir</button>` : ''}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>`;
+    } else {
+      listHtml = `<p style="font-size:0.8rem; color:var(--text-3); margin-bottom:20px;">Nenhuma evidência anexada para este mês.</p>`;
+    }
+
     const content = `
+      ${listHtml}
       <form id="anexoForm" onsubmit="Metas.saveAnexo(event, '${metaId}', '${mes}')">
         <div class="form-group form-full">
-          <label class="form-label">Arquivo (Evidência para ${mes}) *</label>
+          <label class="form-label">Adicionar Nova Evidência *</label>
           <div style="border: 2px dashed rgba(255,255,255,0.2); padding: 20px; text-align: center; border-radius: var(--radius-sm); margin-bottom: 12px; cursor: pointer;" onclick="document.getElementById('fileInput').click()">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" style="margin-bottom: 8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             <div style="font-size: 0.85rem; color: var(--text-2);">Clique para procurar ou arraste o arquivo</div>
@@ -1004,15 +1039,20 @@ const Metas = {
       </form>`;
       
     const footer = `
-      <button class="btn btn-ghost" onclick="Metas.openDetail('${metaId}')">Cancelar</button>
+      <button class="btn btn-ghost" onclick="Metas.openDetail('${metaId}')">Voltar</button>
       <button class="btn btn-primary" onclick="document.getElementById('anexoForm').requestSubmit()">Salvar Anexo</button>`;
       
-    setTimeout(() => Components.openModal(`Incluir Evidência - ${mes}`, content, footer), 350);
+    setTimeout(() => Components.openModal(`Evidências — ${mes}`, content, footer), 350);
   },
 
   saveAnexo(e, metaId, mes) {
     e.preventDefault();
-    const fileName = document.getElementById('fileInput').files[0]?.name || 'documento_anexado.pdf';
+    const file = document.getElementById('fileInput').files[0];
+    if (!file) {
+      Components.toast('Selecione um arquivo de evidência!', 'error');
+      return;
+    }
+    const fileName = file.name;
     
     let metas = DataStore.get(DataStore.KEYS.METAS);
     let m = metas.find(x => x.id === metaId);
@@ -1023,19 +1063,103 @@ const Metas = {
       metaId = m.id; // Atualiza ID para redirecionar no final
     }
 
+    if (!m) return;
+
+    // Indicador de progresso
+    Components.toast('Subindo evidência para a nuvem...', 'info');
+
+    const proceedWithSave = (fileData) => {
+      if (m.mesesData) {
+        let monthObj = m.mesesData.find(x => x.mes === mes);
+        if (monthObj) {
+           if (!monthObj.anexos) monthObj.anexos = [];
+           monthObj.anexos.push({ 
+             nome: fileName, 
+             url: fileData.url || null, 
+             data: new Date().toISOString() 
+           });
+        }
+      }
+      
+      DataStore.set(DataStore.KEYS.METAS, metas);
+      Components.toast('Evidência salva com sucesso.', 'success');
+      Components.closeModal();
+      App.refreshPage();
+      setTimeout(() => Metas.openAnexoForm(metaId, mes), 350);
+    };
+
+    if (isFirebaseActive && storage) {
+      const storageRef = storage.ref(`evidencias/${metaId}_${mes.replace(/\//g, '_')}_${Date.now()}_${fileName}`);
+      const uploadTask = storageRef.put(file);
+      
+      uploadTask.on('state_changed', null, 
+        (error) => {
+          console.error("Erro no upload do Firebase Storage:", error);
+          Components.toast('Falha ao subir arquivo. Salvando apenas offline.', 'warning');
+          proceedWithSave({ url: null });
+        }, 
+        () => {
+          uploadTask.snapshot.ref.getDownloadURL().then((downloadURL) => {
+            proceedWithSave({ url: downloadURL });
+          });
+        }
+      );
+    } else {
+      proceedWithSave({ url: null });
+    }
+  },
+
+  deleteAnexo(metaId, mes, index) {
+    let metas = DataStore.get(DataStore.KEYS.METAS);
+    let m = metas.find(x => x.id === metaId);
+    
+    if (m && m.tipo === 'compartilhada' && m.refMetaId) {
+      m = metas.find(x => x.id === m.refMetaId);
+      metaId = m.id;
+    }
+
     if (m && m.mesesData) {
       let monthObj = m.mesesData.find(x => x.mes === mes);
-      if (monthObj) {
-         if (!monthObj.anexos) monthObj.anexos = [];
-         monthObj.anexos.push({ nome: fileName, data: new Date().toISOString() });
+      if (monthObj && monthObj.anexos) {
+        monthObj.anexos.splice(index, 1);
       }
     }
     
     DataStore.set(DataStore.KEYS.METAS, metas);
-    Components.toast('Evidência salva com sucesso.', 'success');
+    Components.toast('Evidência excluída com sucesso.', 'info');
     Components.closeModal();
     App.refreshPage();
-    setTimeout(() => Metas.openDetail(metaId), 350);
+    setTimeout(() => Metas.openAnexoForm(metaId, mes), 350);
+  },
+
+  viewAnexosOnly(metaId, mes) {
+    Components.closeModal();
+    const meta = DataStore.getMetaById(metaId);
+    let currentAnexos = [];
+    if (meta && meta.mesesData) {
+      const monthObj = meta.mesesData.find(x => x.mes === mes);
+      if (monthObj && monthObj.anexos) {
+        currentAnexos = monthObj.anexos;
+      }
+    }
+
+    let listHtml = '';
+    if (currentAnexos.length > 0) {
+      listHtml = `
+        <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px;">
+          ${currentAnexos.map(anexo => `
+            <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-3); padding:8px 12px; border-radius:var(--radius-xs); border: 1px solid rgba(255,255,255,0.05);">
+              <span style="font-size:0.85rem; color:var(--text-1); font-weight:500;">📎 ${anexo.nome}</span>
+              ${anexo.url ? `<a href="${anexo.url}" target="_blank" class="btn btn-primary btn-sm" style="padding:4px 8px; font-size:0.75rem; text-decoration:none;">Abrir Arquivo</a>` : '<span style="font-size:0.75rem; color:var(--text-3);">Sem link</span>'}
+            </div>
+          `).join('')}
+        </div>`;
+    } else {
+      listHtml = `<p style="font-size:0.85rem; color:var(--text-3); text-align:center; padding:12px 0;">Nenhuma evidência anexada para este mês.</p>`;
+    }
+
+    const footer = `<button class="btn btn-primary" onclick="Metas.openDetail('${metaId}')">Voltar</button>`;
+    setTimeout(() => Components.openModal(`Evidências — ${mes}`, listHtml, footer), 350);
   },
 
   confirmDelete(id) {
@@ -1113,14 +1237,40 @@ const Metas = {
     
     // Handle file attachment
     const file = document.getElementById('acaoFileInput').files[0];
-    if (file) {
-      data.anexo = { nome: file.name, data: new Date().toISOString() };
-    }
     
-    DataStore.add(DataStore.KEYS.ACOES, data);
-    Components.toast('Ação criada com sucesso!', 'success');
-    Components.closeModal();
-    setTimeout(() => Metas.openDetail(metaId), 350);
+    const proceedSaveAcao = (fileData) => {
+      if (fileData) {
+        data.anexo = { nome: fileData.nome, url: fileData.url || null, data: new Date().toISOString() };
+      }
+      DataStore.add(DataStore.KEYS.ACOES, data);
+      Components.toast('Ação criada com sucesso!', 'success');
+      Components.closeModal();
+      setTimeout(() => Metas.openDetail(metaId), 350);
+    };
+
+    if (file) {
+      Components.toast('Subindo anexo da ação para a nuvem...', 'info');
+      if (isFirebaseActive && storage) {
+        const storageRef = storage.ref(`acoes/${targetMetaId}_${Date.now()}_${file.name}`);
+        const uploadTask = storageRef.put(file);
+        uploadTask.on('state_changed', null, 
+          (error) => {
+            console.error("Erro no upload do Firebase Storage:", error);
+            Components.toast('Falha ao subir arquivo. Salvando apenas offline.', 'warning');
+            proceedSaveAcao({ nome: file.name, url: null });
+          }, 
+          () => {
+            uploadTask.snapshot.ref.getDownloadURL().then((downloadURL) => {
+              proceedSaveAcao({ nome: file.name, url: downloadURL });
+            });
+          }
+        );
+      } else {
+        proceedSaveAcao({ nome: file.name, url: null });
+      }
+    } else {
+      proceedSaveAcao(null);
+    }
   },
 
   updateAcaoProgress(acaoId, metaId, progresso) {

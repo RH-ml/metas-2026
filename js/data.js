@@ -5,7 +5,38 @@
 const DataStore = {
   KEYS: { USERS: 'mp_users', METAS: 'mp_metas', ACOES: 'mp_acoes', BONUS: 'mp_bonus', REGRAS: 'mp_regras', AREAS: 'mp_areas', HISTORICO_AREAS: 'mp_hist_areas', SESSION: 'mp_session' },
 
-  init() {
+  async init() {
+    // 1. Se o Firebase estiver ativo, tenta puxar os dados atualizados da nuvem
+    if (isFirebaseActive && db) {
+      try {
+        console.log("🔄 Sincronizando dados com o Firebase Firestore...");
+        
+        // Vamos verificar se a coleção de usuários existe/tem dados
+        const usersSnapshot = await db.collection(this.KEYS.USERS).get();
+        
+        if (usersSnapshot.empty) {
+          // Se o Firestore estiver vazio, vamos semeá-lo com os dados padrões locais!
+          console.log("🌱 Firestore vazio! Semeando banco de dados com dados padrões...");
+          await this.seedFirebaseDatabase();
+        } else {
+          // Caso contrário, baixa os dados das coleções e atualiza o localStorage
+          for (const key of Object.values(this.KEYS)) {
+            if (key === this.KEYS.SESSION) continue; // Sessão é puramente local
+            const snapshot = await db.collection(key).get();
+            const list = [];
+            snapshot.forEach(doc => {
+              list.push(doc.data());
+            });
+            localStorage.setItem(key, JSON.stringify(list));
+          }
+          console.log("✅ Sincronização com Firebase concluída com sucesso!");
+        }
+      } catch (error) {
+        console.error("❌ Falha ao sincronizar dados com o Firebase, usando cache local:", error);
+      }
+    }
+
+    // 2. Fallback de inicialização local padrão (caso o Firebase esteja inativo ou offline)
     let users = this.get(this.KEYS.USERS);
     const shouldInitialize = !Array.isArray(users) || users.length === 0;
     if (shouldInitialize) {
@@ -18,6 +49,7 @@ const DataStore = {
       localStorage.setItem(this.KEYS.HISTORICO_AREAS, JSON.stringify(this.defaultHistoricoAreas()));
       users = this.get(this.KEYS.USERS);
     }
+    
     // Migrate: add areas/historico if missing (existing installs)
     if (!localStorage.getItem(this.KEYS.AREAS)) {
       localStorage.setItem(this.KEYS.AREAS, JSON.stringify(this.defaultAreas()));
@@ -33,6 +65,35 @@ const DataStore = {
     }
   },
 
+  async seedFirebaseDatabase() {
+    if (!isFirebaseActive || !db) return;
+    try {
+      const seedData = {
+        [this.KEYS.USERS]: this.defaultUsers(),
+        [this.KEYS.METAS]: this.defaultMetas(),
+        [this.KEYS.ACOES]: this.defaultAcoes(),
+        [this.KEYS.BONUS]: this.defaultBonus(),
+        [this.KEYS.REGRAS]: this.defaultRegras(),
+        [this.KEYS.AREAS]: this.defaultAreas(),
+        [this.KEYS.HISTORICO_AREAS]: this.defaultHistoricoAreas()
+      };
+
+      for (const [key, list] of Object.entries(seedData)) {
+        console.log(`Semeando coleção ${key}...`);
+        const batch = db.batch();
+        list.forEach(item => {
+          const docRef = db.collection(key).doc(item.id);
+          batch.set(docRef, item);
+        });
+        await batch.commit();
+        localStorage.setItem(key, JSON.stringify(list));
+      }
+      console.log("🌱 Semeamento do Firestore concluído com sucesso!");
+    } catch (e) {
+      console.error("Erro ao semear o Firestore:", e);
+    }
+  },
+
   get(key) {
     const value = localStorage.getItem(key);
     if (!value) return [];
@@ -44,28 +105,67 @@ const DataStore = {
       return [];
     }
   },
-  set(key, data) { localStorage.setItem(key, JSON.stringify(data)); },
-  getById(key, id) { return this.get(key).find(i => i.id === id); },
 
+  set(key, data) {
+    localStorage.setItem(key, JSON.stringify(data));
+    
+    // Sincronização em Lote com o Firebase
+    if (isFirebaseActive && db && key !== this.KEYS.SESSION) {
+      try {
+        const batch = db.batch();
+        data.forEach(item => {
+          const docRef = db.collection(key).doc(item.id);
+          batch.set(docRef, item);
+        });
+        batch.commit().catch(e => console.error(`Erro ao salvar lote no Firebase para ${key}:`, e));
+      } catch (err) {
+        console.error(`Falha ao preparar lote do Firebase para ${key}:`, err);
+      }
+    }
+  },
+
+  getById(key, id) { return this.get(key).find(i => i.id === id); },
+ 
   add(key, item) {
     const data = this.get(key);
     item.id = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
     item.criadoEm = new Date().toISOString();
     data.push(item);
     this.set(key, data);
+
+    // Sincronização em background no Firebase
+    if (isFirebaseActive && db && key !== this.KEYS.SESSION) {
+      db.collection(key).doc(item.id).set(item)
+        .catch(e => console.error(`Erro ao adicionar registro no Firebase para ${key}:`, e));
+    }
     return item;
   },
-
+ 
   update(key, id, updates) {
     const data = this.get(key);
     const idx = data.findIndex(i => i.id === id);
-    if (idx !== -1) { data[idx] = { ...data[idx], ...updates, atualizadoEm: new Date().toISOString() }; this.set(key, data); }
+    if (idx !== -1) { 
+      data[idx] = { ...data[idx], ...updates, atualizadoEm: new Date().toISOString() }; 
+      this.set(key, data);
+      
+      // Sincronização em background no Firebase
+      if (isFirebaseActive && db && key !== this.KEYS.SESSION) {
+        db.collection(key).doc(id).set(data[idx])
+          .catch(e => console.error(`Erro ao atualizar registro no Firebase para ${key}:`, e));
+      }
+    }
     return data[idx];
   },
-
+ 
   remove(key, id) {
     const data = this.get(key).filter(i => i.id !== id);
     this.set(key, data);
+
+    // Sincronização em background no Firebase
+    if (isFirebaseActive && db && key !== this.KEYS.SESSION) {
+      db.collection(key).doc(id).delete()
+        .catch(e => console.error(`Erro ao deletar registro no Firebase para ${key}:`, e));
+    }
   },
 
   defaultUsers() {

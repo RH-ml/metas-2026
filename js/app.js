@@ -5,8 +5,12 @@
 const App = {
   currentRoute: 'login',
 
-  init() {
-    DataStore.init();
+  async init() {
+    try {
+      await DataStore.init();
+    } catch (e) {
+      console.error("Erro na sincronização inicial do DataStore:", e);
+    }
     window.addEventListener('hashchange', () => this.handleRoute());
     this.handleRoute();
   },
