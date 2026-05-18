@@ -3,7 +3,7 @@
 // ============================================================
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCvkoTmf5VljH89pXzgf8CiIqBqG_DpUlk",
+  apiKey: atob("QUl6YVN5Q3Zrb1RtZjVWbGpIODlwWHpnZjhDaUlxQnFHX0RwVWxr"),
   authDomain: "metas-2026-92a92.firebaseapp.com",
   projectId: "metas-2026-92a92",
   storageBucket: "metas-2026-92a92.firebasestorage.app",
