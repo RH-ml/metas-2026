@@ -1054,7 +1054,7 @@ const Metas = {
     }
     const fileName = file.name;
     
-    let metas = DataStore.get(DataStore.KEYS.METAS);
+    let metas = DataStore.getMetas();
     let m = metas.find(x => x.id === metaId);
     
     // GATILHO: Se for meta compartilhada, salvar o anexo na meta de ORIGEM
@@ -1110,7 +1110,7 @@ const Metas = {
   },
 
   deleteAnexo(metaId, mes, index) {
-    let metas = DataStore.get(DataStore.KEYS.METAS);
+    let metas = DataStore.getMetas();
     let m = metas.find(x => x.id === metaId);
     
     if (m && m.tipo === 'compartilhada' && m.refMetaId) {

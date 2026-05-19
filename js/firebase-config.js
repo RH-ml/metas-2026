@@ -21,6 +21,7 @@ if (firebaseConfig.apiKey && firebaseConfig.apiKey !== "SUA_API_KEY") {
   try {
     firebase.initializeApp(firebaseConfig);
     db = firebase.firestore();
+    db.settings({ ignoreUndefinedProperties: true });
     storage = firebase.storage();
     isFirebaseActive = true;
     console.log("🔥 Firebase inicializado com sucesso!");

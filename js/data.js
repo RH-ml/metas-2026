@@ -83,7 +83,8 @@ const DataStore = {
         const batch = db.batch();
         list.forEach(item => {
           const docRef = db.collection(key).doc(item.id);
-          batch.set(docRef, item);
+          const cleanItem = JSON.parse(JSON.stringify(item));
+          batch.set(docRef, cleanItem);
         });
         await batch.commit();
         localStorage.setItem(key, JSON.stringify(list));
@@ -115,7 +116,8 @@ const DataStore = {
         const batch = db.batch();
         data.forEach(item => {
           const docRef = db.collection(key).doc(item.id);
-          batch.set(docRef, item);
+          const cleanItem = JSON.parse(JSON.stringify(item));
+          batch.set(docRef, cleanItem);
         });
         batch.commit().catch(e => console.error(`Erro ao salvar lote no Firebase para ${key}:`, e));
       } catch (err) {
@@ -135,7 +137,8 @@ const DataStore = {
 
     // Sincronização em background no Firebase
     if (isFirebaseActive && db && key !== this.KEYS.SESSION) {
-      db.collection(key).doc(item.id).set(item)
+      const cleanItem = JSON.parse(JSON.stringify(item));
+      db.collection(key).doc(item.id).set(cleanItem)
         .catch(e => console.error(`Erro ao adicionar registro no Firebase para ${key}:`, e));
     }
     return item;
@@ -150,7 +153,8 @@ const DataStore = {
       
       // Sincronização em background no Firebase
       if (isFirebaseActive && db && key !== this.KEYS.SESSION) {
-        db.collection(key).doc(id).set(data[idx])
+        const cleanItem = JSON.parse(JSON.stringify(data[idx]));
+        db.collection(key).doc(id).set(cleanItem)
           .catch(e => console.error(`Erro ao atualizar registro no Firebase para ${key}:`, e));
       }
     }
