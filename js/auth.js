@@ -2,6 +2,17 @@
 // AUTH.JS — Autenticação e controle de sessão
 // ============================================
 
+const msalConfig = {
+    auth: {
+        clientId: "1349995e-48d5-4f58-be87-c19d90593b07", // ID do Aplicativo
+        // Acesso restrito ao diretório da Moura Leite (Tenant ID configurado)
+        authority: "https://login.microsoftonline.com/34bf99e3-12de-4814-ab19-0d0f90fab15b",
+        redirectUri: window.location.origin + window.location.pathname
+    }
+};
+
+const msalInstance = new msal.PublicClientApplication(msalConfig);
+
 const Auth = {
   isLoggedIn() {
     const sessionJson = localStorage.getItem('mp_session');
@@ -77,6 +88,15 @@ const Auth = {
               </div>
               <div id="loginError" class="form-error" style="display:none"></div>
               <button type="submit" class="btn btn-primary btn-block" id="loginBtn" style="background: linear-gradient(135deg, var(--primary), var(--primary-light)); border: none; font-weight: 700;">Entrar</button>
+              
+              <div class="login-divider" style="text-align: center; margin: 20px 0; color: #888; font-size: 0.9em; display: flex; align-items: center;">
+                <hr style="flex: 1; border: none; border-top: 1px solid #333;"><span style="padding: 0 10px;">OU</span><hr style="flex: 1; border: none; border-top: 1px solid #333;">
+              </div>
+              
+              <button type="button" class="btn btn-block" onclick="Auth.loginMicrosoft()" style="background: #fff; color: #333; border: 1px solid #ccc; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 10px; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                <img src="https://learn.microsoft.com/en-us/entra/identity-platform/media/howto-add-branding-in-apps/ms-symbollockup_mssymbol_19.png" alt="Microsoft" style="width: 20px;">
+                Entrar com Microsoft
+              </button>
             </form>
           </div>
         </div>
@@ -97,6 +117,46 @@ const Auth = {
       errEl.style.display = 'block';
       document.getElementById('loginBtn').classList.add('shake');
       setTimeout(() => document.getElementById('loginBtn').classList.remove('shake'), 500);
+    }
+  },
+
+  async loginMicrosoft() {
+    try {
+      await msalInstance.initialize();
+      const loginRequest = {
+        scopes: ["user.read"]
+      };
+
+      const response = await msalInstance.loginPopup(loginRequest);
+      
+      const emailMicrosoft = response.account.username;
+
+      // Verifica se o usuário existe no DataStore do sistema
+      const users = DataStore.get(DataStore.KEYS.USERS);
+      const userNoSistema = users.find(u => u.email.toLowerCase() === emailMicrosoft.toLowerCase());
+
+      if (userNoSistema) {
+        const session = { 
+          id: userNoSistema.id, 
+          nome: userNoSistema.nome, 
+          email: userNoSistema.email, 
+          cargo: userNoSistema.cargo, 
+          area: userNoSistema.area, 
+          nivel: userNoSistema.nivel, 
+          avatar: userNoSistema.avatar 
+        };
+        localStorage.setItem('mp_session', JSON.stringify(session));
+        
+        Components.toast('Login com Microsoft realizado!', 'success');
+        App.navigate('dashboard');
+      } else {
+        alert(`O e-mail ${emailMicrosoft} não está cadastrado no sistema ML Metas. Por favor, contate o Administrador.`);
+        await msalInstance.logoutPopup();
+      }
+
+    } catch (error) {
+      console.error("Erro no login com Microsoft:", error);
+      Components.toast('Erro ao conectar com a Microsoft.', 'error');
     }
   }
 };
