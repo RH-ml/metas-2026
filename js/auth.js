@@ -122,7 +122,6 @@ const Auth = {
 
   async loginMicrosoft() {
     try {
-      await msalInstance.initialize();
       const loginRequest = {
         scopes: ["user.read"]
       };
