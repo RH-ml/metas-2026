@@ -3,13 +3,13 @@
 // ============================================================
 
 const firebaseConfig = {
-  apiKey: atob("QUl6YVN5Q3Zrb1RtZjVWbGpIODlwWHpnZjhDaUlxQnFHX0RwVWxr"),
-  authDomain: "metas-2026-92a92.firebaseapp.com",
-  projectId: "metas-2026-92a92",
-  storageBucket: "metas-2026-92a92.firebasestorage.app",
-  messagingSenderId: "498748762929",
-  appId: "1:498748762929:web:75ec62d3da0de789fade10",
-  measurementId: "G-4TVTXX8NH7"
+  apiKey: "AIzaSyDaH6pLFnjqWfoRgILvO5vALhW9yJXw8aE",
+  authDomain: "metas-2026-3340e.firebaseapp.com",
+  projectId: "metas-2026-3340e",
+  storageBucket: "metas-2026-3340e.firebasestorage.app",
+  messagingSenderId: "1082387701257",
+  appId: "1:1082387701257:web:95bd15ddd3356bdffee2d8",
+  measurementId: "G-WJJ260SGYW"
 };
 
 let db = null;
