@@ -155,7 +155,7 @@ const Auth = {
 
     } catch (error) {
       console.error("Erro no login com Microsoft:", error);
-      Components.toast('Erro ao conectar com a Microsoft.', 'error');
+      Components.toast('Erro: ' + (error.message || 'Falha ao conectar com Microsoft'), 'error');
     }
   }
 };
