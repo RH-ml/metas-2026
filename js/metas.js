@@ -111,9 +111,9 @@ const Metas = {
     };
     
     return `
-      <tr class="matrix-row" onclick="Metas.openDetail('${meta.id}')" style="cursor: pointer; transition: var(--transition);">
-        <td style="font-weight: 600; font-size: 0.85rem; padding-right: 16px;">
-          ${meta.titulo}
+      <tr class="matrix-row ${meta.isSubMeta ? 'matrix-row-sub' : ''}" onclick="Metas.openDetail('${meta.id}')" style="cursor: pointer; transition: var(--transition); ${meta.isSubMeta ? 'background: rgba(255,255,255,0.02);' : ''}">
+        <td style="font-weight: 600; font-size: 0.85rem; padding-right: 16px; ${meta.isSubMeta ? 'padding-left: 32px; border-left: 2px solid rgba(255,255,255,0.1);' : ''}">
+          ${meta.isSubMeta ? '<span style="color: var(--text-3); margin-right: 6px;">↳</span>' : ''}${meta.titulo}
         </td>
         <td style="text-align: center; color: var(--text-3);">${meta.peso}%</td>
         <td style="text-align: center; font-weight: 600;">${Components.formatNumber(notaPond)}</td>
@@ -163,8 +163,39 @@ const Metas = {
     });
     metas = filtered;
     
+    // --- Ordenação e Agrupamento (Metas Compostas Primeiro, seguidas de suas filhas) ---
+    const compostas = metas.filter(m => m.tipo === 'composta');
+    const orderedMetas = [];
+    const addedIds = new Set();
 
-    return metas;
+    compostas.forEach(c => {
+       if (!addedIds.has(c.id)) {
+           c.isSubMeta = false;
+           orderedMetas.push(c);
+           addedIds.add(c.id);
+       }
+       if (Array.isArray(c.composicao)) {
+           c.composicao.forEach(comp => {
+               const filha = metas.find(m => String(m.id) === String(comp.metaId));
+               if (filha && !addedIds.has(filha.id)) {
+                   filha.isSubMeta = true; 
+                   orderedMetas.push(filha);
+                   addedIds.add(filha.id);
+               }
+           });
+       }
+    });
+
+    // Adicionar o restante das metas
+    metas.forEach(m => {
+       if (!addedIds.has(m.id)) {
+           m.isSubMeta = false;
+           orderedMetas.push(m);
+           addedIds.add(m.id);
+       }
+    });
+
+    return orderedMetas;
   },
 
   setArea(a) {
