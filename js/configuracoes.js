@@ -210,10 +210,8 @@ const Configuracoes = {
       Components.closeModal();
       App.refreshPage();
       
-      // Auto-open invite modal
-      setTimeout(() => {
-        Configuracoes.sendInvite(newUser.id);
-      }, 100);
+      // Convite será enviado apenas manualmente pelo botão
+      // setTimeout(() => { Configuracoes.sendInvite(newUser.id); }, 100);
     }
   },
 
@@ -224,7 +222,7 @@ const Configuracoes = {
     // Mostra notificação de envio em andamento
     Components.toast(`Enviando convite para ${user.email}...`, 'info', 5000);
     
-    const inviteLink = `https://metaspro.mouraleite.com.br/invite?token=${btoa(user.id + '-' + Date.now())}`;
+    const inviteLink = `https://rh-ml.github.io/metas-2026/`;
     
     /* 
       ===============================================================
