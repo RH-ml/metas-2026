@@ -69,13 +69,13 @@ const DataStore = {
     if (!isFirebaseActive || !db) return;
     try {
       const seedData = {
-        [this.KEYS.USERS]: this.defaultUsers(),
-        [this.KEYS.METAS]: this.defaultMetas(),
-        [this.KEYS.ACOES]: this.defaultAcoes(),
-        [this.KEYS.BONUS]: this.defaultBonus(),
-        [this.KEYS.REGRAS]: this.defaultRegras(),
-        [this.KEYS.AREAS]: this.defaultAreas(),
-        [this.KEYS.HISTORICO_AREAS]: this.defaultHistoricoAreas()
+        [this.KEYS.USERS]: this.get(this.KEYS.USERS).length > 0 ? this.get(this.KEYS.USERS) : this.defaultUsers(),
+        [this.KEYS.METAS]: this.get(this.KEYS.METAS).length > 0 ? this.get(this.KEYS.METAS) : this.defaultMetas(),
+        [this.KEYS.ACOES]: this.get(this.KEYS.ACOES).length > 0 ? this.get(this.KEYS.ACOES) : this.defaultAcoes(),
+        [this.KEYS.BONUS]: this.get(this.KEYS.BONUS).length > 0 ? this.get(this.KEYS.BONUS) : this.defaultBonus(),
+        [this.KEYS.REGRAS]: this.get(this.KEYS.REGRAS).length > 0 ? this.get(this.KEYS.REGRAS) : this.defaultRegras(),
+        [this.KEYS.AREAS]: this.get(this.KEYS.AREAS).length > 0 ? this.get(this.KEYS.AREAS) : this.defaultAreas(),
+        [this.KEYS.HISTORICO_AREAS]: this.get(this.KEYS.HISTORICO_AREAS).length > 0 ? this.get(this.KEYS.HISTORICO_AREAS) : this.defaultHistoricoAreas()
       };
 
       for (const [key, list] of Object.entries(seedData)) {
