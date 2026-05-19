@@ -69,16 +69,15 @@ const Auth = {
             <form class="login-form" id="loginForm" onsubmit="Auth.handleLogin(event)">
               <div class="form-group">
                 <label class="form-label" for="loginEmail">E-mail</label>
-                <input type="email" id="loginEmail" class="form-input" placeholder="seu@email.com" value="admin@empresa.com" required>
+                <input type="email" id="loginEmail" class="form-input" placeholder="seu@email.com" value="" required>
               </div>
               <div class="form-group">
                 <label class="form-label" for="loginSenha">Senha</label>
-                <input type="password" id="loginSenha" class="form-input" placeholder="••••••" value="admin" required>
+                <input type="password" id="loginSenha" class="form-input" placeholder="••••••" value="" required>
               </div>
               <div id="loginError" class="form-error" style="display:none"></div>
-              <button type="submit" class="btn btn-primary btn-block" id="loginBtn">Entrar</button>
+              <button type="submit" class="btn btn-primary btn-block" id="loginBtn" style="background: linear-gradient(135deg, var(--primary), var(--primary-light)); border: none; font-weight: 700;">Entrar</button>
             </form>
-            <p class="login-hint">Use <strong>admin@empresa.com</strong> / <strong>admin</strong></p>
           </div>
         </div>
       </div>`;
