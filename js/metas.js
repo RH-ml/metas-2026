@@ -1029,7 +1029,7 @@ const Metas = {
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" style="margin-bottom: 8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             <div style="font-size: 0.85rem; color: var(--text-2);">Clique para procurar ou arraste o arquivo</div>
           </div>
-          <input type="file" id="fileInput" name="arquivo" required style="display:none;" onchange="document.getElementById('fileName').textContent = this.files[0]?.name || ''">
+          <input type="file" id="fileInput" name="arquivo" style="display:none;" onchange="document.getElementById('fileName').textContent = this.files[0]?.name || ''">
           <div id="fileName" style="font-size: 0.8rem; color: var(--success); font-weight: 600; text-align: center;"></div>
         </div>
         <div class="form-group form-full">
