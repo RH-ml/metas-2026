@@ -7,6 +7,33 @@ const GraphAPI = {
   siteUrl: "mouraleite1.sharepoint.com",
   sitePath: "/sites/allcompany",
   baseFolderPath: "/Metas 2026",
+  resolvedSiteId: null, // Cache para o Site ID real resolvida no getSiteId()
+
+  /**
+   * Resolve e obtém o Site ID real gerado pela Microsoft a partir do hostname e caminho amigável.
+   * Isso é CRÍTICO para evitar usar o caminho em texto corrido (que contém colons) junto com o 
+   * caminho do arquivo (que também contém colons), o que confunde o OData parser do Graph API.
+   */
+  async getSiteId() {
+    if (this.resolvedSiteId) return this.resolvedSiteId;
+    
+    const token = await this.getToken();
+    if (!token) throw new Error("Usuário não autenticado no Microsoft Graph");
+    
+    const url = `https://graph.microsoft.com/v1.0/sites/${this.siteUrl}:${this.sitePath}`;
+    const response = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`Erro ao resolver Site ID (${response.status}): ${err}`);
+    }
+    
+    const data = await response.json();
+    this.resolvedSiteId = data.id;
+    return this.resolvedSiteId;
+  },
 
   /**
    * Obtém o token de acesso para o Graph API usando o MSAL já configurado no auth.js
@@ -67,9 +94,15 @@ const GraphAPI = {
     const token = await this.getToken();
     if (!token) throw new Error("Usuário não autenticado no Microsoft Graph");
     
+    const siteId = await this.getSiteId();
     const folderPath = subFolder ? `${this.baseFolderPath}/${subFolder}` : this.baseFolderPath;
-    // Graph API endpoint para upload no drive padrão (Documentos Compartilhados) do site
-    const url = `https://graph.microsoft.com/v1.0/sites/${this.siteUrl}:${this.sitePath}:/drive/root:${folderPath}/${fileName}:/content`;
+    
+    // Escapar caracteres especiais no caminho e nome do arquivo (ex: espaços, parênteses como "(9)") para evitar erros no parser do OData/Graph API
+    const escapedFolder = folderPath.split('/').map(seg => encodeURIComponent(seg)).join('/');
+    const escapedFileName = encodeURIComponent(fileName);
+    
+    // Graph API endpoint usando a Site ID real resolvida. Isso remove os colons duplicados que quebravam o parser ("Resource not found for the segment 'root:'")
+    const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/drive/root:${escapedFolder}/${escapedFileName}:/content`;
 
     const response = await fetch(url, {
       method: 'PUT',
@@ -99,9 +132,12 @@ const GraphAPI = {
     const token = await this.getToken();
     if (!token) return null;
     
-    const url = `https://graph.microsoft.com/v1.0/sites/${this.siteUrl}:${this.sitePath}:/drive/root:${this.baseFolderPath}/banco_de_dados.json:/content`;
-    
     try {
+      const siteId = await this.getSiteId();
+      // Escapar caracteres especiais no caminho do banco de dados no SharePoint
+      const escapedFolder = this.baseFolderPath.split('/').map(seg => encodeURIComponent(seg)).join('/');
+      const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/drive/root:${escapedFolder}/banco_de_dados.json:/content`;
+      
       const response = await fetch(url, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
