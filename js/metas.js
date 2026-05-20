@@ -1066,11 +1066,18 @@ const Metas = {
           <div style="font-size: 0.75rem; color: var(--text-3); font-weight: 600; text-transform: uppercase; margin-bottom: 8px;">Evidências Anexadas</div>
           <div style="display: flex; flex-direction: column; gap: 8px;">
             ${currentAnexos.map((anexo, aIdx) => `
-              <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-3); padding:8px 12px; border-radius:var(--radius-xs); border: 1px solid rgba(255,255,255,0.05);">
-                <span style="font-size:0.8rem; color:var(--text-1); font-weight:500;">📎 ${anexo.nome}</span>
-                <div style="display:flex; gap:6px;">
-                  ${anexo.url ? `<a href="${anexo.url}" target="_blank" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:0.75rem; color:var(--primary); text-decoration:none;">Visualizar</a>` : ''}
-                  ${(isAdmin || isOwner) ? `<button type="button" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:0.75rem; color:var(--danger);" onclick="Metas.deleteAnexo('${metaId}', '${mes}', ${aIdx})">Excluir</button>` : ''}
+              <div style="display:flex; flex-direction:column; background:var(--bg-3); padding:12px; border-radius:var(--radius-sm); border: 1px solid rgba(255,255,255,0.05); gap: 8px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <span style="font-size:0.85rem; color:var(--text-1); font-weight:500; word-break:break-all;">📎 ${anexo.nome}</span>
+                  <div style="display:flex; gap:6px;">
+                    ${anexo.url ? `<a href="${anexo.url}" target="_blank" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:0.75rem; color:var(--primary); text-decoration:none; background:rgba(46, 134, 77, 0.1);">👁️ Visualizar</a>` : ''}
+                    ${anexo.downloadUrl ? `<a href="${anexo.downloadUrl}" target="_blank" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:0.75rem; color:var(--text-2); text-decoration:none; background:var(--bg-2);">⬇️ Baixar</a>` : ''}
+                    ${(isAdmin || isOwner) ? `<button type="button" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:0.75rem; color:var(--danger); background:rgba(255, 81, 68, 0.1);" onclick="Metas.deleteAnexo('${metaId}', '${mes}', ${aIdx})">Excluir</button>` : ''}
+                  </div>
+                </div>
+                <div style="display:flex; gap:12px; font-size:0.7rem; color:var(--text-3);">
+                  <span>👤 ${anexo.usuarioNome || 'Não registrado'}</span>
+                  <span>🕒 ${new Date(anexo.dataHora || anexo.data || Date.now()).toLocaleString('pt-BR')}</span>
                 </div>
               </div>
             `).join('')}
@@ -1105,7 +1112,7 @@ const Metas = {
     setTimeout(() => Components.openModal(`Evidências — ${mes}`, content, footer), 350);
   },
 
-  saveAnexo(e, metaId, mes) {
+  async saveAnexo(e, metaId, mes) {
     e.preventDefault();
     const file = document.getElementById('fileInput').files[0];
     if (!file) {
@@ -1113,6 +1120,7 @@ const Metas = {
       return;
     }
     const fileName = file.name;
+    const session = Auth.getSession() || {};
     
     let metas = DataStore.getMetas();
     let m = metas.find(x => x.id === metaId);
@@ -1126,7 +1134,7 @@ const Metas = {
     if (!m) return;
 
     // Indicador de progresso
-    Components.toast('Subindo evidência para a nuvem...', 'info');
+    Components.toast('Fazendo upload da evidência para o SharePoint...', 'info');
 
     const proceedWithSave = (fileData) => {
       if (m.mesesData) {
@@ -1135,8 +1143,10 @@ const Metas = {
            if (!monthObj.anexos) monthObj.anexos = [];
            monthObj.anexos.push({ 
              nome: fileName, 
-             url: fileData.url || null, 
-             data: new Date().toISOString() 
+             url: fileData.webUrl || null, 
+             downloadUrl: fileData.downloadUrl || null,
+             usuarioNome: session.nome || session.id || 'Usuário Desconhecido',
+             dataHora: new Date().toISOString() 
            });
         }
       }
@@ -1148,24 +1158,19 @@ const Metas = {
       setTimeout(() => Metas.openAnexoForm(metaId, mes), 350);
     };
 
-    if (isFirebaseActive && storage) {
-      const storageRef = storage.ref(`evidencias/${metaId}_${mes.replace(/\//g, '_')}_${Date.now()}_${fileName}`);
-      const uploadTask = storageRef.put(file);
-      
-      uploadTask.on('state_changed', null, 
-        (error) => {
-          console.error("Erro no upload do Firebase Storage:", error);
-          Components.toast('Falha ao subir arquivo. Salvando apenas offline.', 'warning');
-          proceedWithSave({ url: null });
-        }, 
-        () => {
-          uploadTask.snapshot.ref.getDownloadURL().then((downloadURL) => {
-            proceedWithSave({ url: downloadURL });
-          });
-        }
-      );
+    if (typeof GraphAPI !== 'undefined') {
+      try {
+        // Criar nome único para evitar sobreposições
+        const uniqueFileName = `${Date.now()}_${fileName}`;
+        // Faz o upload na pasta "Anexos" dentro da pasta do sistema no SharePoint
+        const graphData = await GraphAPI.uploadFile(uniqueFileName, file, 'Anexos');
+        proceedWithSave(graphData);
+      } catch (error) {
+        console.error("Erro no upload do Graph API:", error);
+        Components.toast('Falha ao subir arquivo para o SharePoint.', 'error');
+      }
     } else {
-      proceedWithSave({ url: null });
+      Components.toast('Módulo do SharePoint (Graph API) não encontrado!', 'error');
     }
   },
 
@@ -1208,9 +1213,18 @@ const Metas = {
       listHtml = `
         <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px;">
           ${currentAnexos.map(anexo => `
-            <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-3); padding:8px 12px; border-radius:var(--radius-xs); border: 1px solid rgba(255,255,255,0.05);">
-              <span style="font-size:0.85rem; color:var(--text-1); font-weight:500;">📎 ${anexo.nome}</span>
-              ${anexo.url ? `<a href="${anexo.url}" target="_blank" class="btn btn-primary btn-sm" style="padding:4px 8px; font-size:0.75rem; text-decoration:none;">Abrir Arquivo</a>` : '<span style="font-size:0.75rem; color:var(--text-3);">Sem link</span>'}
+            <div style="display:flex; flex-direction:column; background:var(--bg-3); padding:12px; border-radius:var(--radius-sm); border: 1px solid rgba(255,255,255,0.05); gap: 8px;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:0.85rem; color:var(--text-1); font-weight:500; word-break:break-all;">📎 ${anexo.nome}</span>
+                <div style="display:flex; gap:6px;">
+                  ${anexo.url ? `<a href="${anexo.url}" target="_blank" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:0.75rem; color:var(--primary); text-decoration:none; background:rgba(46, 134, 77, 0.1);">👁️ Visualizar</a>` : ''}
+                  ${anexo.downloadUrl ? `<a href="${anexo.downloadUrl}" target="_blank" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:0.75rem; color:var(--text-2); text-decoration:none; background:var(--bg-2);">⬇️ Baixar</a>` : ''}
+                </div>
+              </div>
+              <div style="display:flex; gap:12px; font-size:0.7rem; color:var(--text-3);">
+                <span>👤 ${anexo.usuarioNome || 'Não registrado'}</span>
+                <span>🕒 ${new Date(anexo.dataHora || anexo.data || Date.now()).toLocaleString('pt-BR')}</span>
+              </div>
             </div>
           `).join('')}
         </div>`;
