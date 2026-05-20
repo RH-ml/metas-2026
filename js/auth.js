@@ -47,6 +47,8 @@ const Auth = {
 
   logout() {
     localStorage.removeItem('mp_session');
+    localStorage.removeItem('metas_filter_area');
+    if (typeof Metas !== 'undefined') Metas.currentArea = '';
     App.navigate('login');
   },
 

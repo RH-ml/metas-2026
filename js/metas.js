@@ -146,6 +146,15 @@ const Metas = {
     const session = Auth.getSession() || {};
     const isAdmin = session.id === 'admin' || session.nivel === 'Admin';
     
+    // Security check: if currentArea is set but user is not authorized to see it, clear it
+    if (this.currentArea && this.currentArea !== 'todas' && this.currentArea !== 'all') {
+      const authorizedIds = DataStore.getAuthorizedAreas().map(a => a.id);
+      if (!isAdmin && !authorizedIds.includes(this.currentArea)) {
+        this.currentArea = '';
+        localStorage.removeItem('metas_filter_area');
+      }
+    }
+
     if (!this.currentArea) return [];
 
     let metas = DataStore.getMetas();
