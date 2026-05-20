@@ -219,8 +219,9 @@ const Metas = {
     const getColorClass = val => (val === null || val === undefined) ? '' : (val >= 100 ? 'matrix-bg-green' : val >= 80 ? 'matrix-bg-yellow' : 'matrix-bg-red');
 
     const meses = meta.mesesData || [];
-    const isAdmin = Auth.getSession()?.id === 'admin';
-    const isOwner = Auth.getSession()?.id === meta.responsavelId;
+    const session = Auth.getSession() || {};
+    const isAdmin = session.id === 'admin' || session.nivel === 'Admin';
+    const isOwner = session.id === meta.responsavelId || (Array.isArray(meta.coresponsavelIds) && meta.coresponsavelIds.includes(session.id));
 
     const getMatrixFieldValue = (m, dataKey, field) => {
       const monthData = m[dataKey] || {};
@@ -319,10 +320,10 @@ const Metas = {
             <tr class="matrix-detail-row">
               <td class="matrix-detail-label">Anexo:</td>
               ${meses.map((m, idx) => {
-                const canEditAnexo = isAdmin || isOwner;
+                const canUploadAnexo = isAdmin || isOwner;
                 return `
                 <td class="matrix-detail-cell text-primary">
-                  <div class="${canEditAnexo ? 'matrix-inline-edit' : ''}" title="${canEditAnexo ? 'Anexar Evidência' : 'Visualizar Evidências'}" style="${canEditAnexo ? 'cursor:pointer;' : 'cursor:default;'}" ${canEditAnexo ? `onclick="Metas.openAnexoForm('${meta.id}', '${m.mes}')"` : `onclick="Metas.viewAnexosOnly('${meta.id}', '${m.mes}')"`}>
+                  <div class="matrix-inline-edit" title="${canUploadAnexo ? 'Anexar Evidência' : 'Visualizar Evidências'}" style="cursor:pointer;" ${canUploadAnexo ? `onclick="Metas.openAnexoForm('${meta.id}', '${m.mes}')"` : `onclick="Metas.viewAnexosOnly('${meta.id}', '${m.mes}')"` }>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 2px;"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
                     (${m.anexos ? m.anexos.length : 0})
                   </div>
