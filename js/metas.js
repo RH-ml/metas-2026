@@ -1167,7 +1167,7 @@ const Metas = {
         proceedWithSave(graphData);
       } catch (error) {
         console.error("Erro no upload do Graph API:", error);
-        Components.toast('Falha ao subir arquivo para o SharePoint.', 'error');
+        Components.toast(`Erro: ${error.message}`, 'error');
       }
     } else {
       Components.toast('Módulo do SharePoint (Graph API) não encontrado!', 'error');

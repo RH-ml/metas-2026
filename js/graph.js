@@ -6,7 +6,7 @@ const GraphAPI = {
   // Configurações do SharePoint extraídas do link fornecido
   siteUrl: "mouraleite1.sharepoint.com",
   sitePath: "/sites/allcompany",
-  baseFolderPath: "/Shared Documents/Metas 2026",
+  baseFolderPath: "/Metas 2026",
 
   /**
    * Obtém o token de acesso para o Graph API usando o MSAL já configurado no auth.js
