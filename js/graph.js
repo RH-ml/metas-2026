@@ -12,11 +12,27 @@ const GraphAPI = {
    * Obtém o token de acesso para o Graph API usando o MSAL já configurado no auth.js
    */
   async getToken() {
-    if (!window.msalInstance) {
+    const instance = window.msalInstance || (typeof msalInstance !== 'undefined' ? msalInstance : null);
+    if (!instance) {
       console.error("MSAL não inicializado");
       return null;
     }
-    const accounts = msalInstance.getAllAccounts();
+    
+    let accounts = instance.getAllAccounts();
+    if (accounts.length === 0) {
+      console.warn("Nenhuma conta Microsoft ativa encontrada no MSAL. Tentando autenticação via popup...");
+      try {
+        const loginRequest = {
+          scopes: ["Sites.ReadWrite.All", "Files.ReadWrite.All", "User.Read"]
+        };
+        await instance.loginPopup(loginRequest);
+        accounts = instance.getAllAccounts();
+      } catch (loginError) {
+        console.error("Erro ao autenticar usuário via popup do MSAL:", loginError);
+        return null;
+      }
+    }
+    
     if (accounts.length === 0) return null;
     
     const request = {
@@ -26,12 +42,12 @@ const GraphAPI = {
 
     try {
       // Tenta obter o token silenciosamente (do cache)
-      const response = await msalInstance.acquireTokenSilent(request);
+      const response = await instance.acquireTokenSilent(request);
       return response.accessToken;
     } catch (e) {
       console.warn("Token silencioso falhou. Tentando popup...", e);
       try {
-        const response = await msalInstance.acquireTokenPopup(request);
+        const response = await instance.acquireTokenPopup(request);
         return response.accessToken;
       } catch (err) {
         console.error("Erro ao obter token do Graph:", err);

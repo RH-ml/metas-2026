@@ -12,6 +12,7 @@ const msalConfig = {
 };
 
 const msalInstance = new msal.PublicClientApplication(msalConfig);
+window.msalInstance = msalInstance;
 
 const Auth = {
   isLoggedIn() {
