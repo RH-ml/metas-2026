@@ -677,23 +677,49 @@ const DataStore = {
   },
 
   getAuthorizedAreas() {
+    const session = Auth.getSession() || {};
     const rootId = Auth.getUserRootAreaId();
     if (rootId === 'all') return this.getAreas();
     if (!rootId) return [];
+
+    // Área própria + sub-áreas
     const visibleIds = this.getVisibleAreaIds(rootId);
+
+    // Para Diretoria: adicionar também a área pai (corporativa)
+    if (session.nivel === 'Diretoria') {
+      const ownArea = this.getAreaById(rootId);
+      if (ownArea && ownArea.parentId && !visibleIds.includes(ownArea.parentId)) {
+        visibleIds.unshift(ownArea.parentId);
+      }
+    }
+
     return this.getAreas().filter(a => visibleIds.includes(a.id));
   },
 
   getAuthorizedAreaTree() {
+    const session = Auth.getSession() || {};
     const rootId = Auth.getUserRootAreaId();
     if (rootId === 'all') return this.buildAreaTree();
     if (!rootId) return [];
-    
+
     const areas = this.getAuthorizedAreas();
     const buildNode = (area) => ({
       ...area,
       children: areas.filter(a => a.parentId === area.id).map(buildNode)
     });
+
+    // Para Diretoria: exibir árvore como [corporativa → [sua diretoria → [sub-áreas]]]
+    if (session.nivel === 'Diretoria') {
+      const ownArea = this.getAreaById(rootId);
+      if (ownArea && ownArea.parentId) {
+        const corporateArea = this.getAreaById(ownArea.parentId);
+        if (corporateArea) {
+          const ownNode = buildNode(ownArea);
+          return [{ ...corporateArea, children: [ownNode] }];
+        }
+      }
+    }
+
     const rootArea = areas.find(a => a.id === rootId);
     return rootArea ? [buildNode(rootArea)] : [];
   },

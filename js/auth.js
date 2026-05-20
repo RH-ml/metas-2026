@@ -53,8 +53,10 @@ const Auth = {
   getUserRootAreaId() {
     const session = this.getSession();
     if (!session) return null;
-    if (session.id === 'admin') return 'all';
-    // No DataStore, o getAreaAtual retorna o objeto da área. Precisamos do ID.
+    // Admin tem acesso total a todas as áreas
+    if (session.id === 'admin' || session.nivel === 'Admin') return 'all';
+    // Diretoria e demais: retorna sua própria área
+    // (DataStore.getAuthorizedAreas adicionará a área corporativa para diretores)
     const area = DataStore.getAreaAtual(session.id);
     return area ? area.id : null;
   },
@@ -110,6 +112,7 @@ const Auth = {
     const result = Auth.login(email, senha);
     if (result.success) {
       Components.toast('Login realizado com sucesso!', 'success');
+      localStorage.removeItem('metas_filter_area'); // Force clear area on login
       App.navigate('dashboard');
     } else {
       const errEl = document.getElementById('loginError');
@@ -145,6 +148,7 @@ const Auth = {
           avatar: userNoSistema.avatar 
         };
         localStorage.setItem('mp_session', JSON.stringify(session));
+        localStorage.removeItem('metas_filter_area'); // Force clear area on login
         
         Components.toast('Login com Microsoft realizado!', 'success');
         App.navigate('dashboard');

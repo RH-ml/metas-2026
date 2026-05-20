@@ -3,7 +3,7 @@
 // ============================================
 
 const Metas = {
-  currentArea: localStorage.getItem('metas_filter_area') || 'todas',
+  currentArea: localStorage.getItem('metas_filter_area') || '',
   currentFilter: localStorage.getItem('metas_filter_status') || 'todas',
   currentSearch: '',
 
@@ -143,11 +143,24 @@ const Metas = {
   },
 
   getFilteredMetas() {
+    const session = Auth.getSession() || {};
+    const isAdmin = session.id === 'admin' || session.nivel === 'Admin';
+    
+    if (!this.currentArea) return [];
+
     let metas = DataStore.getMetas();
     
-    // Filter by area
+    // Filter by area — includes the selected area and all its sub-areas
     if (this.currentArea !== 'todas' && this.currentArea !== 'all') {
-      metas = metas.filter(m => m.areaId === this.currentArea);
+      const selectedArea = DataStore.getAreaById(this.currentArea);
+      // Área raiz (corporativa, sem parentId): mostrar apenas metas diretamente nessa área
+      if (selectedArea && !selectedArea.parentId) {
+        metas = metas.filter(m => m.areaId === this.currentArea);
+      } else {
+        // Demais áreas: incluir sub-áreas
+        const visibleAreaIds = DataStore.getVisibleAreaIds(this.currentArea);
+        metas = metas.filter(m => visibleAreaIds.includes(m.areaId));
+      }
     }
 
     let filtered = metas.filter(m => {
