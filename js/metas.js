@@ -1261,6 +1261,27 @@ const Metas = {
             <input type="file" id="acaoFileInput" name="arquivo" style="display:none;" onchange="document.getElementById('acaoFileName').textContent = this.files[0]?.name || ''">
             <div id="acaoFileName" style="font-size: 0.8rem; color: var(--success); font-weight: 600; text-align: center; margin-top: 4px;"></div>
           </div>
+          ${isEdit ? `
+          <div class="form-group form-full">
+            <label class="form-label" style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-3);">Detalhes</label>
+            <div style="background: var(--bg-3); border-radius: var(--radius-xs); padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; border: 1px solid rgba(255,255,255,0.06);">
+              <div style="display: flex; align-items: center; gap: 8px; font-size: 0.78rem;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span style="color: var(--text-3);">Criado por:</span>
+                <span style="color: var(--text-1); font-weight: 600;">${acao && acao.criadoPorNome ? acao.criadoPorNome : 'Não informado'}</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px; font-size: 0.78rem;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <span style="color: var(--text-3);">Criado em:</span>
+                <span style="color: var(--text-1);">${acao && acao.criadoEm ? new Date(acao.criadoEm).toLocaleString('pt-BR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : 'Não informado'}</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px; font-size: 0.78rem;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                <span style="color: var(--text-3);">Última atualização:</span>
+                <span style="color: var(--text-1);">${acao && acao.atualizadoEm ? new Date(acao.atualizadoEm).toLocaleString('pt-BR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : 'Não informado'}</span>
+              </div>
+            </div>
+          </div>` : ''}
         </div>
       </form>`;
 
@@ -1298,6 +1319,8 @@ const Metas = {
       acao.status = 'nao_iniciada';
       acao.progresso = 0;
       acao.criadoEm = new Date().toISOString();
+      acao.criadoPorId = session.id;
+      acao.criadoPorNome = session.nome || session.id;
     }
     acao.atualizadoEm = new Date().toISOString();
     
