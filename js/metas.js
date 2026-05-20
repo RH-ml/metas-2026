@@ -356,15 +356,21 @@ const Metas = {
                   else if (prazo && hoje > prazo) statusAuto = 'atrasada';
                   
                   return `
-                  <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-                    <td style="padding: 12px; font-size: 0.85rem; font-weight: 600; color: var(--text-1);">${a.titulo}</td>
-                    <td style="padding: 12px; font-size: 0.8rem; color: var(--text-2);">
+                  <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer;" onclick="Metas.openAcaoForm('${meta.id}', '${a.id}')">
+                    <td style="padding: 12px; font-size: 0.85rem; font-weight: 600; color: var(--text-1); vertical-align: middle;">${a.titulo}</td>
+                    <td style="padding: 12px; font-size: 0.8rem; color: var(--text-2); vertical-align: middle;">
                       ${a.descricao || 'Sem descrição'}
-                      ${a.anexo ? `<br>${a.anexo.url ? `<a href="${a.anexo.url}" target="_blank" style="font-size: 0.7rem; color: var(--success); text-decoration: underline; display: inline-flex; align-items: center; gap: 3px;">📎 ${a.anexo.nome}</a>` : `<span style="font-size: 0.7rem; color: var(--success);">📎 ${a.anexo.nome}</span>`}` : ''}
+                      ${a.anexo && a.anexo.nome ? `
+                        <br>
+                        <div style="margin-top: 4px;">
+                          ${a.anexo.url ? `<a href="${a.anexo.url}" target="_blank" onclick="event.stopPropagation()" style="font-size: 0.7rem; color: var(--success); text-decoration: underline; display: inline-flex; align-items: center; gap: 3px;">📎 ${a.anexo.nome}</a>` : `<span style="font-size: 0.7rem; color: var(--success);">📎 ${a.anexo.nome}</span>`}
+                          ${a.anexo.usuarioNome ? `<span style="font-size: 0.65rem; color: var(--text-3); margin-left: 6px;">por ${a.anexo.usuarioNome} em ${new Date(a.anexo.dataHora || a.anexo.data).toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'})}</span>` : ''}
+                        </div>
+                      ` : ''}
                     </td>
-                    <td style="padding: 12px; text-align: center;"><span id="acao-status-${a.id}">${Components.badge(statusAuto, statusAuto)}</span></td>
-                    <td style="padding: 12px; text-align: center;">
-                      <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                    <td style="padding: 12px; text-align: center; vertical-align: middle;"><span id="acao-status-${a.id}">${Components.badge(statusAuto, statusAuto)}</span></td>
+                    <td style="padding: 12px; text-align: center; vertical-align: middle;" onclick="event.stopPropagation()">
+                      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; height: 100%;">
                         <span id="acao-percent-${a.id}" style="font-size: 0.7rem; font-weight: 600; color: var(--text-2);">${progresso}%</span>
                         <input id="acao-range-${a.id}" type="range" min="0" max="100" value="${progresso}" style="width: 60px; height: 4px; accent-color: var(--primary); cursor: pointer;" onchange="Metas.updateAcaoProgress('${a.id}', '${meta.id}', this.value)">
                       </div>
@@ -1208,73 +1214,115 @@ const Metas = {
     App.refreshPage();
   },
 
-  openAcaoForm(metaId) {
+  openAcaoForm(metaId, acaoId = null) {
     const users = DataStore.getUsers();
+    const acao = acaoId ? DataStore.get(DataStore.KEYS.ACOES, acaoId) : null;
+    const session = Auth.getSession() || {};
+    const isAdmin = session.id === 'admin' || session.nivel === 'Admin';
+    const isEdit = !!acao;
+    
+    // Regular users can only edit attachment if they are editing
+    const disableFields = isEdit && !isAdmin;
+
     const content = `
-      <form id="acaoForm" onsubmit="Metas.saveAcao(event, '${metaId}')">
+      <form id="acaoForm" onsubmit="Metas.saveAcao(event, '${metaId}', '${acaoId || ''}')">
         <div class="form-grid">
           <div class="form-group form-full">
             <label class="form-label">Causa *</label>
-            <input class="form-input" name="titulo" required placeholder="Descreva a causa da ação">
+            <input class="form-input" name="titulo" required placeholder="Descreva a causa da ação" value="${acao ? acao.titulo : ''}" ${disableFields ? 'disabled' : ''}>
           </div>
           <div class="form-group form-full">
             <label class="form-label">Descrição</label>
-            <textarea class="form-input form-textarea" name="descricao" rows="2" placeholder="Descreva a ação..."></textarea>
+            <textarea class="form-input form-textarea" name="descricao" rows="2" placeholder="Descreva a ação..." ${disableFields ? 'disabled' : ''}>${acao ? (acao.descricao || '') : ''}</textarea>
           </div>
           <div class="form-group">
             <label class="form-label">Responsável</label>
-            <select class="form-input" name="responsavelId">
+            <select class="form-input" name="responsavelId" ${disableFields ? 'disabled' : ''}>
               <option value="">Selecione...</option>
-              ${users.map(u => `<option value="${u.id}">${u.nome}</option>`).join('')}
+              ${users.map(u => `<option value="${u.id}" ${acao && acao.responsavelId === u.id ? 'selected' : ''}>${u.nome}</option>`).join('')}
             </select>
           </div>
           <div class="form-group">
             <label class="form-label">Prazo</label>
-            <input class="form-input" type="date" name="prazo">
+            <input class="form-input" type="date" name="prazo" value="${acao && acao.prazo ? acao.prazo : ''}" ${disableFields ? 'disabled' : ''}>
           </div>
           <div class="form-group form-full">
             <label class="form-label">Anexo</label>
+            ${acao && acao.anexo && acao.anexo.nome ? `
+              <div style="margin-bottom: 8px; font-size: 0.8rem; background: var(--bg-3); padding: 8px; border-radius: 4px;">
+                <strong>Anexo atual:</strong> ${acao.anexo.url ? `<a href="${acao.anexo.url}" target="_blank">${acao.anexo.nome}</a>` : acao.anexo.nome}
+                ${acao.anexo.usuarioNome ? `<div style="font-size: 0.7rem; color: var(--text-3); margin-top: 4px;">Anexado por ${acao.anexo.usuarioNome} em ${new Date(acao.anexo.dataHora || acao.anexo.data).toLocaleString('pt-BR')}</div>` : ''}
+              </div>
+            ` : ''}
             <div style="border: 2px dashed rgba(255,255,255,0.2); padding: 20px; text-align: center; border-radius: var(--radius-sm); cursor: pointer;" onclick="document.getElementById('acaoFileInput').click()">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" style="margin-bottom: 8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-              <div style="font-size: 0.85rem; color: var(--text-2);">Clique para anexar arquivo</div>
+              <div style="font-size: 0.85rem; color: var(--text-2);">${acao && acao.anexo && acao.anexo.nome ? 'Clique para substituir o arquivo' : 'Clique para anexar arquivo'}</div>
             </div>
             <input type="file" id="acaoFileInput" name="arquivo" style="display:none;" onchange="document.getElementById('acaoFileName').textContent = this.files[0]?.name || ''">
-            <div id="acaoFileName" style="font-size: 0.8rem; color: var(--success); font-weight: 600; text-align: center;"></div>
+            <div id="acaoFileName" style="font-size: 0.8rem; color: var(--success); font-weight: 600; text-align: center; margin-top: 4px;"></div>
           </div>
         </div>
       </form>`;
 
     const footer = `
-      <button class="btn btn-ghost" onclick="Components.closeModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="document.getElementById('acaoForm').requestSubmit()">Criar Ação</button>`;
+      <button class="btn btn-ghost" onclick="Metas.openDetail('${metaId}')">Cancelar</button>
+      ${isEdit && isAdmin ? `<button class="btn btn-danger" onclick="Metas.deleteAcao('${acaoId}', '${metaId}')">Excluir</button>` : ''}
+      <button class="btn btn-primary" onclick="document.getElementById('acaoForm').requestSubmit()">${isEdit ? 'Salvar Alterações' : 'Criar Ação'}</button>`;
 
     Components.closeModal();
-    setTimeout(() => Components.openModal('Nova Ação', content, footer), 350);
+    setTimeout(() => Components.openModal(isEdit ? 'Editar Ação' : 'Nova Ação', content, footer), 350);
   },
 
-  saveAcao(e, metaId) {
+  saveAcao(e, metaId, acaoId) {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(e.target));
+    const isEdit = !!acaoId;
+    let acao = isEdit ? DataStore.get(DataStore.KEYS.ACOES, acaoId) : {};
+    
+    const session = Auth.getSession() || {};
+    const isAdmin = session.id === 'admin' || session.nivel === 'Admin';
     
     // GATILHO: Se for meta compartilhada, salvar a ação na meta de ORIGEM
     const meta = DataStore.getMetaById(metaId);
     const targetMetaId = (meta && meta.tipo === 'compartilhada' && meta.refMetaId) ? meta.refMetaId : metaId;
-    
-    data.metaId = targetMetaId;
-    data.status = 'nao_iniciada'; // Status padrão
-    data.progresso = 0; // Progresso inicial
-    data.criadoEm = new Date().toISOString();
-    data.atualizadoEm = new Date().toISOString();
+
+    if (!isEdit || isAdmin) {
+      acao.titulo = data.titulo;
+      acao.descricao = data.descricao;
+      acao.responsavelId = data.responsavelId;
+      acao.prazo = data.prazo;
+    }
+
+    if (!isEdit) {
+      acao.metaId = targetMetaId;
+      acao.status = 'nao_iniciada';
+      acao.progresso = 0;
+      acao.criadoEm = new Date().toISOString();
+    }
+    acao.atualizadoEm = new Date().toISOString();
     
     // Handle file attachment
     const file = document.getElementById('acaoFileInput').files[0];
     
     const proceedSaveAcao = (fileData) => {
       if (fileData) {
-        data.anexo = { nome: fileData.nome, url: fileData.url || null, data: new Date().toISOString() };
+        acao.anexo = { 
+          nome: fileData.nome, 
+          url: fileData.url || null, 
+          data: new Date().toISOString(),
+          dataHora: new Date().toISOString(),
+          usuarioId: session.id,
+          usuarioNome: session.nome
+        };
       }
-      DataStore.add(DataStore.KEYS.ACOES, data);
-      Components.toast('Ação criada com sucesso!', 'success');
+      
+      if (isEdit) {
+        DataStore.update(DataStore.KEYS.ACOES, acaoId, acao);
+        Components.toast('Ação atualizada com sucesso!', 'success');
+      } else {
+        DataStore.add(DataStore.KEYS.ACOES, acao);
+        Components.toast('Ação criada com sucesso!', 'success');
+      }
       Components.closeModal();
       setTimeout(() => Metas.openDetail(metaId), 350);
     };
