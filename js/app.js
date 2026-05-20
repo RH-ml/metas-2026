@@ -31,6 +31,13 @@ const App = {
         this.navigate('dashboard');
         return;
       }
+
+      const session = Auth.getSession() || {};
+      const isAdmin = session.id === 'admin' || session.nivel === 'Admin';
+      if (!isAdmin && ['remuneracao', 'relatorios', 'configuracoes'].includes(hash)) {
+        this.navigate('dashboard');
+        return;
+      }
     }
 
     this.currentRoute = hash;

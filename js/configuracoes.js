@@ -41,6 +41,9 @@ const Configuracoes = {
         return area && visibleIds.includes(area.id);
       });
     }
+
+    users.sort((a, b) => a.nome.localeCompare(b.nome));
+
     return `
       <div class="card">
         <div class="card-header">
@@ -412,6 +415,8 @@ const Configuracoes = {
         return area && visibleIds.includes(area.id);
       });
     }
+
+    users.sort((a, b) => a.nome.localeCompare(b.nome));
 
     return `
       <div class="card">
