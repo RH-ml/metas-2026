@@ -370,9 +370,9 @@ const Metas = {
                     </td>
                     <td style="padding: 12px; text-align: center; vertical-align: middle;"><span id="acao-status-${a.id}">${Components.badge(statusAuto, statusAuto)}</span></td>
                     <td style="padding: 12px; text-align: center; vertical-align: middle;" onclick="event.stopPropagation()">
-                      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; height: 100%;">
-                        <span id="acao-percent-${a.id}" style="font-size: 0.7rem; font-weight: 600; color: var(--text-2);">${progresso}%</span>
+                      <div style="display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 8px; height: 100%;">
                         <input id="acao-range-${a.id}" type="range" min="0" max="100" value="${progresso}" style="width: 60px; height: 4px; accent-color: var(--primary); cursor: pointer;" onchange="Metas.updateAcaoProgress('${a.id}', '${meta.id}', this.value)">
+                        <span id="acao-percent-${a.id}" style="font-size: 0.75rem; font-weight: 600; color: var(--text-2); min-width: 28px; text-align: right;">${progresso}%</span>
                       </div>
                     </td>
                   </tr>`;
@@ -1216,7 +1216,7 @@ const Metas = {
 
   openAcaoForm(metaId, acaoId = null) {
     const users = DataStore.getUsers();
-    const acao = acaoId ? DataStore.get(DataStore.KEYS.ACOES, acaoId) : null;
+    const acao = acaoId ? DataStore.getById(DataStore.KEYS.ACOES, acaoId) : null;
     const session = Auth.getSession() || {};
     const isAdmin = session.id === 'admin' || session.nivel === 'Admin';
     const isEdit = !!acao;
@@ -1277,7 +1277,7 @@ const Metas = {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(e.target));
     const isEdit = !!acaoId;
-    let acao = isEdit ? DataStore.get(DataStore.KEYS.ACOES, acaoId) : {};
+    let acao = isEdit ? { ...DataStore.getById(DataStore.KEYS.ACOES, acaoId) } : {};
     
     const session = Auth.getSession() || {};
     const isAdmin = session.id === 'admin' || session.nivel === 'Admin';
