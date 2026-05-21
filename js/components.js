@@ -22,7 +22,7 @@ const Components = {
       <aside class="sidebar" id="sidebar">
         <div class="sidebar-brand">
           <div class="sidebar-logo">
-            <img src="img/logo.png" style="width: 32px; height: 32px; object-fit: contain;" alt="Moura Leite Logo">
+            <img src="img/logo.png" style="width: 44px; height: 44px; object-fit: contain;" alt="Moura Leite Logo">
           </div>
           <span class="sidebar-brand-text">ML Metas</span>
         </div>
