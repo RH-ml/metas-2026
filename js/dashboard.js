@@ -3,7 +3,7 @@
 // ============================================
 
 const Dashboard = {
-  currentArea: localStorage.getItem('dash_filter_area') || 'todas',
+  currentArea: localStorage.getItem('dash_filter_area') || '',
 
   setArea(a) {
     this.currentArea = a;
@@ -12,16 +12,20 @@ const Dashboard = {
   },
 
   render() {
-    let metas = DataStore.getMetas().filter(m => m.tipo !== 'compartilhada');
-    
-    let users = DataStore.getUsers();
-    if (this.currentArea !== 'todas' && this.currentArea !== 'all') {
-      users = users.filter(u => {
-        const area = DataStore.getAreaAtual(u.id);
-        return area && area.id === this.currentArea;
-      });
+    const session = Auth.getSession() || {};
+    const isAdmin = session.id === 'admin' || session.nivel === 'Admin';
+
+    // Security check: if currentArea is set but user is not authorized to see it, clear it
+    if (this.currentArea && this.currentArea !== 'todas' && this.currentArea !== 'all') {
+      const authorizedIds = DataStore.getAuthorizedAreas().map(a => a.id);
+      if (!isAdmin && !authorizedIds.includes(this.currentArea)) {
+        this.currentArea = '';
+        localStorage.removeItem('dash_filter_area');
+      }
     }
 
+    let metas = DataStore.getMetas().filter(m => m.tipo !== 'compartilhada');
+    
     // Corporate section
     const corpMetas = metas.filter(m => m.tipo === 'corporativa');
     const gatilhos = corpMetas.filter(m => m.isGatilho);
@@ -29,10 +33,17 @@ const Dashboard = {
     const corpPerf = corpPesoTotal > 0 ? corpMetas.reduce((s, m) => s + ((DataStore.calcPerformance(m) || 0) * (parseFloat(m.peso) || 0)), 0) / corpPesoTotal : 0;
 
     // Area section
-    let areaMetas = metas;
-    if (this.currentArea !== 'todas' && this.currentArea !== 'all') {
-      areaMetas = metas.filter(m => m.areaId === this.currentArea);
+    let areaMetas = [];
+    if (this.currentArea && this.currentArea !== 'todas' && this.currentArea !== 'all') {
+      const selectedArea = DataStore.getAreaById(this.currentArea);
+      if (selectedArea && !selectedArea.parentId) {
+        areaMetas = metas.filter(m => m.areaId === this.currentArea);
+      } else {
+        const visibleAreaIds = DataStore.getVisibleAreaIds(this.currentArea);
+        areaMetas = metas.filter(m => visibleAreaIds.includes(m.areaId));
+      }
     }
+
     const areaPesoTotal = areaMetas.reduce((s, m) => s + (parseFloat(m.peso) || 0), 0);
     const areaPerf = areaPesoTotal > 0 ? areaMetas.reduce((s, m) => s + ((DataStore.calcPerformance(m) || 0) * (parseFloat(m.peso) || 0)), 0) / areaPesoTotal : 0;
     
@@ -104,6 +115,11 @@ const Dashboard = {
           <div class="dashboard-col area-section">
             <h2 class="split-title" style="display:flex;align-items:center;gap:8px;margin-bottom:16px;font-size:1.1rem;color:var(--text);">${icMetas} Painel Próprio</h2>
             
+            ${!this.currentArea ? `
+              <div style="background: var(--bg-2); border: 1px dashed rgba(255,255,255,0.1); border-radius: var(--radius); padding: 32px; text-align: center; color: var(--text-3); font-size: 0.9rem; margin-top: 16px;">
+                Selecione uma área no filtro acima para carregar o painel próprio.
+              </div>
+            ` : `
             <div class="kpi-grid area-kpi-grid" style="grid-template-columns: 1fr 1fr; margin-bottom:16px;">
               ${Components.kpiCard('Total de Metas', totalArea, 'Metas da área', icMetas, 'primary')}
               
@@ -142,7 +158,7 @@ const Dashboard = {
                 <p class="perf-label">Média ponderada do painel próprio</p>
               </div>
             </div>
-
+            `}
           </div>
         </div>
       </div>`;
