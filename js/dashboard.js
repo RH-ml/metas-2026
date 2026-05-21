@@ -158,7 +158,6 @@ const Dashboard = {
                 <p class="perf-label">Média ponderada do painel próprio</p>
               </div>
             </div>
-            `}
           </div>
         </div>
       </div>`;

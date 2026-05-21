@@ -651,74 +651,19 @@ const Metas = {
     const metaId = window._tempEditId;
     const meta = metaId ? DataStore.getMetaById(metaId) : null;
     const allMetas = DataStore.getMetas().filter(m => m.id !== metaId && m.tipo !== 'composta');
-    const users = DataStore.getUsers();
 
     const inputPeso = document.getElementById('metaPeso');
     const labelPeso = document.getElementById('metaPesoLabel');
 
-          if (tipo === 'compartilhada') {
-        if (inputPeso) {
-          inputPeso.required = false;
-          inputPeso.min = "0";
-        }
-        if (labelPeso) labelPeso.textContent = 'Peso (%)';
-      } else if (tipo === 'individual') {
-        // Peso opcional para metas individuais (incluindo as que serão compartilhadas)
-        if (inputPeso) {
-          inputPeso.required = false;
-          inputPeso.min = "0";
-        }
-        if (labelPeso) labelPeso.textContent = 'Peso (%)';
-      } else {
-        if (inputPeso) {
-          inputPeso.required = true;
-        }
-        if (labelPeso) labelPeso.textContent = 'Peso (%) *';
-      }
-      if (inputPeso) {
-        inputPeso.required = false;
-        inputPeso.min = "0";
-      }
-      if (labelPeso) labelPeso.textContent = 'Peso (%)';
-    } else {
-      if (inputPeso) {
-        inputPeso.required = true;
-      }
+    // Peso: obrigatório apenas para composta
+    if (tipo === 'composta') {
+      if (inputPeso) { inputPeso.required = true; inputPeso.min = "1"; }
       if (labelPeso) labelPeso.textContent = 'Peso (%) *';
+    } else {
+      if (inputPeso) { inputPeso.required = false; inputPeso.min = "0"; }
+      if (labelPeso) labelPeso.textContent = 'Peso (%)';
     }
 
-          if (tipo === 'individual') {
-        // Individual metas: peso opcional, exibe campos de curva, observações e base metas
-        container.style.display = 'block';
-        // Render apenas os campos que são relevantes para metas individuais
-        container.innerHTML = `
-          <div class="form-group form-full">
-            <label class="form-label">Tipo de Curva</label>
-            <select class="form-input" name="tipoCurva" id="metaTipoCurva" onchange="Metas.renderCurvaInputs()">
-              <option value="0-80-100-120" ${meta && meta.tipoCurva === '0-80-100-120' ? 'selected' : ''}>0 - 80 - 100 - 120</option>
-              <option value="80-100-120" ${meta && meta.tipoCurva === '80-100-120' ? 'selected' : ''}>80 - 100 - 120</option>
-              <option value="80-100" ${meta && meta.tipoCurva === '80-100' ? 'selected' : ''}>80 - 100</option>
-              <option value="100" ${meta && meta.tipoCurva === '100' ? 'selected' : ''}>100 (Atingiu ou não)</option>
-            </select>
-          </div>
-          <div class="form-group form-full">
-            <label class="form-label">Valores da Curva</label>
-            <div id="curvaInputsContainer" style="display:flex; gap:12px; align-items:center; background:var(--bg-2); padding:12px; border-radius:var(--radius-sm); border:1px solid rgba(255,255,255,0.06);"></div>
-          </div>
-          <div class="form-group form-full">
-            <label class="form-label">Observações</label>
-            <textarea class="form-input" name="observacoes" rows="3" placeholder="Detalhe a regra de cálculo da meta e o que foi considerado...">${meta && meta.observacoes ? meta.observacoes : ''}</textarea>
-          </div>
-          <div class="form-group form-full">
-            <label class="form-label">Base Metas</label>
-        inputPeso.min = "1";
-      }
-    }
-    if (labelPeso) {
-      labelPeso.textContent = (tipo === 'compartilhada' || tipo === 'individual') ? 'Peso (%)' : 'Peso (%) *';
-    }
-
-    // Render extra fields based on type
     if (tipo === 'individual') {
       container.style.display = 'block';
       container.innerHTML = `
@@ -742,18 +687,13 @@ const Metas = {
         <div class="form-group form-full">
           <label class="form-label">Base Metas</label>
           ${meta && meta.anexoRegra ? `
-            <div style="margin-bottom: 8px; font-size: 0.85rem;">
+            <div style="margin-bottom:8px;font-size:0.85rem;">
               <strong>Arquivo atual:</strong> <a href="${meta.anexoRegra.url}" target="_blank" style="color:var(--primary);">${meta.anexoRegra.nome}</a>
-            </div>
-          ` : ''}
+            </div>` : ''}
           <input type="file" class="form-input" id="metaAnexoRegra" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg">
         </div>
       `;
-      // Ensure weight is optional
-      if (inputPeso) {
-        inputPeso.required = false;
-        inputPeso.min = "0";
-      }
+      this.renderCurvaInputs();
       return;
     }
 
@@ -783,7 +723,6 @@ const Metas = {
       return;
     }
 
-    // Compartilhada
     if (tipo === 'compartilhada') {
       const available = DataStore.getMetas().filter(m => m.id !== metaId && m.tipo === 'individual');
       container.style.display = 'block';
@@ -800,7 +739,6 @@ const Metas = {
       return;
     }
 
-    // Default hide extra fields
     container.style.display = 'none';
   },
 
