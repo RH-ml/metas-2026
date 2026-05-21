@@ -147,8 +147,8 @@ const Metas = {
     const isAdmin = session.id === 'admin' || session.nivel === 'Admin';
     
     // Security check: if currentArea is set but user is not authorized to see it, clear it
-    if (this.currentArea) {
-      if (this.currentArea === 'todas' || this.currentArea === 'all') {
+    // If no specific area is set, show all metas (handled later)
+    if (this.currentArea === 'todas' || this.currentArea === 'all') {
         if (!isAdmin) {
           this.currentArea = '';
           localStorage.removeItem('metas_filter_area');
@@ -162,21 +162,26 @@ const Metas = {
       }
     }
 
-    if (!this.currentArea) return [];
-
+    // Retrieve all metas, but optionally exclude shared metas from the list
     let metas = DataStore.getMetas();
+    // Exclude shared metas only for display purposes (they are shown via sharing logic elsewhere)
+    metas = metas.filter(m => m.tipo !== 'compartilhada');
     
-    // Filter by area — includes only the selected area
-    if (this.currentArea !== 'todas' && this.currentArea !== 'all') {
-      metas = metas.filter(m => m.areaId === this.currentArea);
+    // If a specific area is selected, filter by that area; otherwise show all metas
+    let areaMetas = [];
+    if (this.currentArea && this.currentArea !== 'todas' && this.currentArea !== 'all') {
+      areaMetas = metas.filter(m => m.areaId === this.currentArea);
+    } else {
+      // No specific area selected – show all metas
+      areaMetas = metas;
     }
-
-    let filtered = metas.filter(m => {
+    
+    // Apply additional filters (search, status) – these were previously in getFilteredMetas
+    let filtered = areaMetas.filter(m => {
       // Regra de Ouro: Metas compartilhadas (espelhos) só aparecem no painel individual do responsável.
       if (m.tipo === 'compartilhada' && (this.currentArea === 'todas' || this.currentArea === 'all')) {
         return false;
       }
-
       const s = this.currentSearch.toLowerCase();
       const matchSearch = (m.titulo || '').toLowerCase().includes(s) || 
                           (m.codigo || '').toLowerCase().includes(s);
@@ -188,7 +193,7 @@ const Metas = {
     const compostas = metas.filter(m => m.tipo === 'composta');
     const orderedMetas = [];
     const addedIds = new Set();
-
+    
     compostas.forEach(c => {
        if (!addedIds.has(c.id)) {
            c.isSubMeta = false;
@@ -211,7 +216,7 @@ const Metas = {
            });
        }
     });
-
+    
     // Adicionar o restante das metas
     metas.forEach(m => {
        if (!addedIds.has(m.id)) {
@@ -220,7 +225,7 @@ const Metas = {
            addedIds.add(m.id);
        }
     });
-
+    
     return orderedMetas;
   },
 
@@ -707,32 +712,55 @@ const Metas = {
           </div>
           <div class="form-group form-full">
             <label class="form-label">Base Metas</label>
-            ${meta && meta.anexoRegra ? `
-              <div style="margin-bottom: 8px; font-size: 0.85rem;">
-                <strong>Arquivo atual:</strong> <a href="${meta.anexoRegra.url}" target="_blank" style="color:var(--primary);">${meta.anexoRegra.nome}</a>
-              </div>
-            ` : ''}
-            <input type="file" class="form-input" id="metaAnexoRegra" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg">
-          </div>
-        `;
-        // Para metas individuais o peso não é obrigatório
-        if (inputPeso) {
-          inputPeso.required = false;
-          inputPeso.min = "0";
-        }
-        return;
+        inputPeso.min = "1";
       }
+    }
+    if (labelPeso) {
+      labelPeso.textContent = (tipo === 'compartilhada' || tipo === 'individual') ? 'Peso (%)' : 'Peso (%) *';
+    }
 
-      container.style.display = 'none';
-      if (inputPeso) inputPeso.min = "0";
+    // Render extra fields based on type
+    if (tipo === 'individual') {
+      container.style.display = 'block';
+      container.innerHTML = `
+        <div class="form-group form-full">
+          <label class="form-label">Tipo de Curva</label>
+          <select class="form-input" name="tipoCurva" id="metaTipoCurva" onchange="Metas.renderCurvaInputs()">
+            <option value="0-80-100-120" ${meta && meta.tipoCurva === '0-80-100-120' ? 'selected' : ''}>0 - 80 - 100 - 120</option>
+            <option value="80-100-120" ${meta && meta.tipoCurva === '80-100-120' ? 'selected' : ''}>80 - 100 - 120</option>
+            <option value="80-100" ${meta && meta.tipoCurva === '80-100' ? 'selected' : ''}>80 - 100</option>
+            <option value="100" ${meta && meta.tipoCurva === '100' ? 'selected' : ''}>100 (Atingiu ou não)</option>
+          </select>
+        </div>
+        <div class="form-group form-full">
+          <label class="form-label">Valores da Curva</label>
+          <div id="curvaInputsContainer" style="display:flex; gap:12px; align-items:center; background:var(--bg-2); padding:12px; border-radius:var(--radius-sm); border:1px solid rgba(255,255,255,0.06);"></div>
+        </div>
+        <div class="form-group form-full">
+          <label class="form-label">Observações</label>
+          <textarea class="form-input" name="observacoes" rows="3" placeholder="Detalhe a regra de cálculo da meta e o que foi considerado...">${meta && meta.observacoes ? meta.observacoes : ''}</textarea>
+        </div>
+        <div class="form-group form-full">
+          <label class="form-label">Base Metas</label>
+          ${meta && meta.anexoRegra ? `
+            <div style="margin-bottom: 8px; font-size: 0.85rem;">
+              <strong>Arquivo atual:</strong> <a href="${meta.anexoRegra.url}" target="_blank" style="color:var(--primary);">${meta.anexoRegra.nome}</a>
+            </div>
+          ` : ''}
+          <input type="file" class="form-input" id="metaAnexoRegra" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg">
+        </div>
+      `;
+      // Ensure weight is optional
+      if (inputPeso) {
+        inputPeso.required = false;
+        inputPeso.min = "0";
+      }
       return;
     }
 
-    container.style.display = 'block';
-    if (inputPeso && tipo !== 'compartilhada') inputPeso.min = "1";
-    
     if (tipo === 'composta') {
       const composicao = meta?.composicao || [{ metaId: '', peso: 0 }];
+      container.style.display = 'block';
       container.innerHTML = `
         <label class="form-label">Composição da Meta (Soma deve ser 100%)</label>
         <div id="composicaoList" style="display:flex; flex-direction:column; gap:8px;">
@@ -753,20 +781,28 @@ const Metas = {
         <div id="composicaoTotal" style="font-size:0.75rem; font-weight:700; margin-top:8px; color:var(--text-3);">Total: 0%</div>
       `;
       this.validateComposicao();
-    } else if (tipo === 'compartilhada') {
-      const allMetas = DataStore.getMetas().filter(m => m.id !== metaId && m.tipo === 'individual');
+      return;
+    }
+
+    // Compartilhada
+    if (tipo === 'compartilhada') {
+      const available = DataStore.getMetas().filter(m => m.id !== metaId && m.tipo === 'individual');
+      container.style.display = 'block';
       container.innerHTML = `
         <div class="form-group">
           <label class="form-label">Vincular a Meta de Origem *</label>
           <select class="form-input" name="refMetaId" required onchange="Metas.syncFormWithSource(this.value)">
             <option value="">Selecionar meta para compartilhar...</option>
-            ${allMetas.map(m => `<option value="${m.id}" ${meta?.refMetaId === m.id ? 'selected' : ''}>${m.codigo} - ${m.titulo}</option>`).join('')}
+            ${available.map(m => `<option value="${m.id}" ${meta?.refMetaId === m.id ? 'selected' : ''}>${m.codigo} - ${m.titulo}</option>`).join('')}
           </select>
           <small style="color:var(--text-3); display:block; margin-top:4px;">Nota, Curva e Resultados serão sincronizados com a origem.</small>
         </div>
       `;
-      container.style.display = 'block';
+      return;
     }
+
+    // Default hide extra fields
+    container.style.display = 'none';
   },
 
   syncFormWithSource(sourceId) {

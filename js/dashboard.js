@@ -43,6 +43,9 @@ const Dashboard = {
     let areaMetas = [];
     if (this.currentArea && this.currentArea !== 'todas' && this.currentArea !== 'all') {
       areaMetas = metas.filter(m => m.areaId === this.currentArea);
+    } else {
+      // If no specific area selected, show all metas
+      areaMetas = metas;
     }
 
     const areaPesoTotal = areaMetas.reduce((s, m) => s + (parseFloat(m.peso) || 0), 0);
@@ -115,12 +118,7 @@ const Dashboard = {
           <!-- LADO DIREITO: PAINEL DA ÁREA -->
           <div class="dashboard-col area-section">
             <h2 class="split-title" style="display:flex;align-items:center;gap:8px;margin-bottom:16px;font-size:1.1rem;color:var(--text);">${icMetas} Painel Próprio</h2>
-            
-            ${(!this.currentArea || this.currentArea === 'todas' || this.currentArea === 'all') ? `
-              <div style="background: var(--bg-2); border: 1px dashed rgba(255,255,255,0.1); border-radius: var(--radius); padding: 32px; text-align: center; color: var(--text-3); font-size: 0.9rem; margin-top: 16px;">
-                Selecione uma área no filtro acima para carregar o painel próprio.
-              </div>
-            ` : `
+            ${(!this.currentArea || this.currentArea === 'todas' || this.currentArea === 'all') ? `` : `
             <div class="kpi-grid area-kpi-grid" style="grid-template-columns: 1fr 1fr; margin-bottom:16px;">
               ${Components.kpiCard('Total de Metas', totalArea, 'Metas da área', icMetas, 'primary')}
               
@@ -151,6 +149,7 @@ const Dashboard = {
                  </div>
               </div>
             </div>
+            `}
 
             <div class="card card-performance">
               <div class="card-header"><h3 class="card-title">Nota Final da Área</h3></div>
