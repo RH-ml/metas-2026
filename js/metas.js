@@ -1136,13 +1136,13 @@ const Metas = {
     // Indicador de progresso
     Components.toast('Fazendo upload da evidência para o SharePoint...', 'info');
 
-    const proceedWithSave = (fileData) => {
+    const proceedWithSave = (fileData, finalFileName) => {
       if (m.mesesData) {
         let monthObj = m.mesesData.find(x => x.mes === mes);
         if (monthObj) {
            if (!monthObj.anexos) monthObj.anexos = [];
            monthObj.anexos.push({ 
-             nome: fileName, 
+             nome: finalFileName, 
              url: fileData.webUrl || null, 
              downloadUrl: fileData.downloadUrl || null,
              usuarioNome: session.nome || session.id || 'Usuário Desconhecido',
@@ -1160,11 +1160,27 @@ const Metas = {
 
     if (typeof GraphAPI !== 'undefined') {
       try {
-        // Criar nome único para evitar sobreposições
-        const uniqueFileName = `${Date.now()}_${fileName}`;
-        // Faz o upload na pasta "Anexos" dentro da pasta do sistema no SharePoint
-        const graphData = await GraphAPI.uploadFile(uniqueFileName, file, 'Anexos');
-        proceedWithSave(graphData);
+        const mesesMap = {
+          'JAN': '01', 'FEV': '02', 'MAR': '03', 'ABR': '04', 'MAI': '05', 'JUN': '06',
+          'JUL': '07', 'AGO': '08', 'SET': '09', 'OUT': '10', 'NOV': '11', 'DEZ': '12'
+        };
+        const mesKey = mes.split('/')[0].toUpperCase();
+        const numMes = mesesMap[mesKey] || mesKey;
+        
+        const extension = fileName.includes('.') ? fileName.split('.').pop() : '';
+        const extStr = extension ? `.${extension}` : '';
+        
+        const monthObj = m.mesesData ? m.mesesData.find(x => x.mes === mes) : null;
+        const anexosCount = monthObj && monthObj.anexos ? monthObj.anexos.length : 0;
+        
+        // Renomeia o arquivo para o número do mês (01.pdf). Se houver múltiplos, adiciona sufixo (01_2.pdf)
+        const newFileName = anexosCount === 0 ? `${numMes}${extStr}` : `${numMes}_${anexosCount + 1}${extStr}`;
+        
+        // Pasta baseada no nome da meta (removendo caracteres especiais que podem quebrar a URL do SharePoint)
+        const safeMetaTitle = m.titulo.replace(/[^a-zA-Z0-9 _-]/g, '').trim() || 'Evidencias';
+
+        const graphData = await GraphAPI.uploadFile(newFileName, file, safeMetaTitle);
+        proceedWithSave(graphData, newFileName);
       } catch (error) {
         console.error("Erro no upload do Graph API:", error);
         Components.toast(`Erro: ${error.message}`, 'error');
