@@ -117,9 +117,15 @@ const Auth = {
     const result = Auth.login(email, senha);
     if (result.success) {
       Components.toast('Login realizado com sucesso!', 'success');
-      localStorage.removeItem('metas_filter_area'); // Force clear area on login
+      localStorage.removeItem('metas_filter_area');
       localStorage.removeItem('dash_filter_area');
-      App.navigate('dashboard');
+      // If hash is already '#dashboard', hashchange won't fire — call handleRoute directly
+      if (window.location.hash === '#dashboard') {
+        App.handleRoute();
+      } else {
+        App.navigate('dashboard');
+        App.handleRoute();
+      }
     } else {
       const errEl = document.getElementById('loginError');
       errEl.textContent = result.message;
@@ -154,11 +160,15 @@ const Auth = {
           avatar: userNoSistema.avatar 
         };
         localStorage.setItem('mp_session', JSON.stringify(session));
-        localStorage.removeItem('metas_filter_area'); // Force clear area on login
+        localStorage.removeItem('metas_filter_area');
         localStorage.removeItem('dash_filter_area');
-        
+
         Components.toast('Login com Microsoft realizado!', 'success');
-        App.navigate('dashboard');
+        if (window.location.hash === '#dashboard') {
+          App.handleRoute();
+        } else {
+          App.navigate('dashboard');
+        }
       } else {
         alert(`O e-mail ${emailMicrosoft} não está cadastrado no sistema ML Metas. Por favor, contate o Administrador.`);
         await msalInstance.logoutPopup();

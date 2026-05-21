@@ -149,16 +149,15 @@ const Metas = {
     // Security check: if currentArea is set but user is not authorized to see it, clear it
     // If no specific area is set, show all metas (handled later)
     if (this.currentArea === 'todas' || this.currentArea === 'all') {
-        if (!isAdmin) {
-          this.currentArea = '';
-          localStorage.removeItem('metas_filter_area');
-        }
-      } else {
-        const authorizedIds = DataStore.getAuthorizedAreas().map(a => a.id);
-        if (!isAdmin && !authorizedIds.includes(this.currentArea)) {
-          this.currentArea = '';
-          localStorage.removeItem('metas_filter_area');
-        }
+      if (!isAdmin) {
+        this.currentArea = '';
+        localStorage.removeItem('metas_filter_area');
+      }
+    } else if (this.currentArea) {
+      const authorizedIds = DataStore.getAuthorizedAreas().map(a => a.id);
+      if (!isAdmin && !authorizedIds.includes(this.currentArea)) {
+        this.currentArea = '';
+        localStorage.removeItem('metas_filter_area');
       }
     }
 
