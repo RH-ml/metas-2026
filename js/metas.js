@@ -478,7 +478,7 @@ const Metas = {
         </div>
         ${infoItem('Código', meta.codigo || '—')}
         ${infoItem('Peso', (meta.peso || 0) + '%')}
-        ${infoItem('Nota', perf !== null ? Components.formatNumber(perf) : 'N/A')}
+        ${infoItem('Base Metas', meta.anexoRegra && meta.anexoRegra.downloadUrl ? `<a href="${meta.anexoRegra.downloadUrl}" target="_blank" style="color:var(--primary); text-decoration:none;">📎 Baixar</a>` : '—')}
         ${infoItem('Responsável', responsavel ? responsavel.nome : '—')}
         ${infoItem('Área', area ? area.nome : '—')}
         ${infoItem('Tipo', tipoLabels[meta.tipo] || meta.tipo)}
@@ -489,6 +489,7 @@ const Metas = {
           ${infoItem('Tipo de Curva', curvaLabels[meta.tipoCurva] || meta.tipoCurva || '0 - 80 - 100 - 120')}
         </div>
         ${curvaHtml}
+        ${meta.observacoes ? `<div style="grid-column: 1 / -1; margin-top: 8px;"><div style="font-size: 0.75rem; color: var(--text-3); font-weight: 600; text-transform: uppercase; margin-bottom: 8px;">Observações</div><div style="background: var(--bg-3); padding: 12px; border-radius: var(--radius-xs); border: 1px solid rgba(255,255,255,0.05); font-size: 0.85rem; color: var(--text); white-space: pre-wrap;">${meta.observacoes}</div></div>` : ''}
         ${composicaoHtml}
         ${compartilhadaHtml}
       </div>`;
@@ -531,8 +532,8 @@ const Metas = {
           </div>
           
           <div class="form-group">
-            <label class="form-label">Peso (%) *</label>
-            <input class="form-input" type="number" min="0" max="100" id="metaPeso" name="peso" value="${meta ? meta.peso : 10}" required oninput="Metas.updatePesoProgress()">
+            <label class="form-label" id="metaPesoLabel">Peso (%) *</label>
+            <input class="form-input" type="number" step="0.01" min="0" max="100" id="metaPeso" name="peso" value="${meta ? meta.peso : 10}" required oninput="Metas.updatePesoProgress()">
           </div>
           
           <div class="form-group form-full" style="margin-top:-10px; margin-bottom:10px;">
@@ -603,6 +604,21 @@ const Metas = {
             </div>
           </div>
           
+          <div class="form-group form-full">
+            <label class="form-label">Observações</label>
+            <textarea class="form-input" name="observacoes" rows="3" placeholder="Detalhe a regra de cálculo da meta e o que foi considerado...">${meta && meta.observacoes ? meta.observacoes : ''}</textarea>
+          </div>
+          
+          <div class="form-group form-full">
+            <label class="form-label">Base Metas</label>
+            ${meta && meta.anexoRegra ? `
+              <div style="margin-bottom: 8px; font-size: 0.85rem;">
+                <strong>Arquivo atual:</strong> <a href="${meta.anexoRegra.url}" target="_blank" style="color:var(--primary);">${meta.anexoRegra.nome}</a>
+              </div>
+            ` : ''}
+            <input type="file" class="form-input" id="metaAnexoRegra" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg">
+          </div>
+          
 
         </div>
       </form>`;
@@ -634,6 +650,20 @@ const Metas = {
     const users = DataStore.getUsers();
 
     const inputPeso = document.getElementById('metaPeso');
+    const labelPeso = document.getElementById('metaPesoLabel');
+
+    if (tipo === 'compartilhada') {
+      if (inputPeso) {
+        inputPeso.required = false;
+        inputPeso.min = "0";
+      }
+      if (labelPeso) labelPeso.textContent = 'Peso (%)';
+    } else {
+      if (inputPeso) {
+        inputPeso.required = true;
+      }
+      if (labelPeso) labelPeso.textContent = 'Peso (%) *';
+    }
 
     if (tipo === 'individual') {
       container.style.display = 'none';
@@ -642,7 +672,7 @@ const Metas = {
     }
 
     container.style.display = 'block';
-    if (inputPeso) inputPeso.min = "1";
+    if (inputPeso && tipo !== 'compartilhada') inputPeso.min = "1";
     
     if (tipo === 'composta') {
       const composicao = meta?.composicao || [{ metaId: '', peso: 0 }];
@@ -655,7 +685,7 @@ const Metas = {
                 <option value="">Selecionar Meta Individual...</option>
                 ${allMetas.map(m => `<option value="${m.id}" ${c.metaId === m.id ? 'selected' : ''}>${m.codigo} - ${m.titulo}</option>`).join('')}
               </select>
-              <input type="number" class="form-input" name="comp_peso_${i}" value="${c.peso}" placeholder="Peso %" style="flex:1;" oninput="Metas.validateComposicao()">
+              <input type="number" step="0.01" class="form-input" name="comp_peso_${i}" value="${c.peso}" placeholder="Peso %" style="flex:1;" oninput="Metas.validateComposicao()">
               <button type="button" class="btn btn-icon" onclick="this.parentElement.remove(); Metas.validateComposicao();">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
               </button>
@@ -679,7 +709,6 @@ const Metas = {
         </div>
       `;
       container.style.display = 'block';
-      if (inputPeso) inputPeso.min = "1";
     }
   },
 
@@ -720,7 +749,7 @@ const Metas = {
         <option value="">Selecionar Meta Individual...</option>
         ${allMetas.map(m => `<option value="${m.id}">${m.codigo} - ${m.titulo}</option>`).join('')}
       </select>
-      <input type="number" class="form-input" name="comp_peso_${index}" value="0" placeholder="Peso %" style="flex:1;" oninput="Metas.validateComposicao()">
+      <input type="number" step="0.01" class="form-input" name="comp_peso_${index}" value="0" placeholder="Peso %" style="flex:1;" oninput="Metas.validateComposicao()">
       <button type="button" class="btn btn-icon" onclick="this.parentElement.remove(); Metas.validateComposicao();">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
       </button>
@@ -787,10 +816,15 @@ const Metas = {
     container.innerHTML = html;
   },
 
-  saveMeta(e, editId) {
+  async saveMeta(e, editId) {
     e.preventDefault();
     const form = e.target;
-    const data = Object.fromEntries(new FormData(form));
+    
+    const submitBtn = document.querySelector('.modal-footer button.btn-primary');
+    if (submitBtn) submitBtn.disabled = true;
+
+    try {
+      const data = Object.fromEntries(new FormData(form));
     
     // Validation
     const respId = data.responsavelId;
@@ -814,6 +848,39 @@ const Metas = {
     
     data.valoresCurva = valoresCurva;
     data.peso = pesoInput;
+    
+    const fileInput = document.getElementById('metaAnexoRegra');
+    const file = fileInput ? fileInput.files[0] : null;
+
+    if (editId) {
+      const oldMeta = DataStore.getMetaById(editId);
+      if (oldMeta && oldMeta.anexoRegra) {
+        data.anexoRegra = oldMeta.anexoRegra;
+      }
+    }
+
+    if (file) {
+      if (typeof GraphAPI !== 'undefined') {
+        Components.toast('Fazendo upload do anexo da regra...', 'info');
+        const safeMetaTitle = data.titulo.replace(/[^a-zA-Z0-9 _-]/g, '').trim() || 'RegraMeta';
+        const extension = file.name.includes('.') ? file.name.split('.').pop() : '';
+        const newFileName = `Regra_${safeMetaTitle}_${Date.now()}.${extension}`;
+        
+        try {
+          const graphData = await GraphAPI.uploadFile(newFileName, file, 'RegrasMetas');
+          data.anexoRegra = {
+            nome: newFileName,
+            url: graphData.webUrl || null,
+            downloadUrl: graphData.downloadUrl || null,
+            usuarioNome: Auth.getSession()?.nome || 'Admin',
+            dataHora: new Date().toISOString()
+          };
+        } catch (err) {
+           console.error("Erro no upload do anexo da regra", err);
+           Components.toast('Erro no upload do anexo. Salvando meta sem o novo anexo.', 'error');
+        }
+      }
+    }
     
     // Processar campos extras (Composição e Compartilhamento)
     if (data.tipo === 'composta') {
@@ -876,6 +943,10 @@ const Metas = {
     }
     Components.closeModal();
     App.refreshPage();
+    } finally {
+      const submitBtn = document.querySelector('.modal-footer button.btn-primary');
+      if (submitBtn) submitBtn.disabled = false;
+    }
   },
 
   enableInlineEdit(metaId, mes, tdId, dataKey, field) {
