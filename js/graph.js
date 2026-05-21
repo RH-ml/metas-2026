@@ -7,7 +7,7 @@ const GraphAPI = {
   siteUrl: "mouraleite1.sharepoint.com",
   sitePath: "/sites/BancodeDados",
   baseFolderPath: "/Metas_2026",
-  listName: "FormServerTemplates",
+  listName: "", // Deixando em branco, ele usará a biblioteca padrão "Documentos"
   resolvedSiteId: null, // Cache para o Site ID real resolvida no getSiteId()
   resolvedDriveId: null, // Cache para o Drive ID da biblioteca de destino
 
@@ -47,6 +47,16 @@ const GraphAPI = {
     const token = await this.getToken();
     if (!token) throw new Error("Usuário não autenticado no Microsoft Graph");
     
+    if (!this.listName) {
+       // Pega o drive padrão (Documentos) do site
+       const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/drive`;
+       const response = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+       if (!response.ok) throw new Error("Erro ao acessar biblioteca padrão.");
+       const data = await response.json();
+       this.resolvedDriveId = data.id;
+       return this.resolvedDriveId;
+    }
+
     // Tenta primeiro obter a lista pelo nome e pegar o drive associado
     const urlList = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${this.listName}/drive`;
     const responseList = await fetch(urlList, {
