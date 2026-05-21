@@ -47,6 +47,19 @@ const GraphAPI = {
     const token = await this.getToken();
     if (!token) throw new Error("Usuário não autenticado no Microsoft Graph");
     
+    // Tenta primeiro obter a lista pelo nome e pegar o drive associado
+    const urlList = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${this.listName}/drive`;
+    const responseList = await fetch(urlList, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    if (responseList.ok) {
+      const driveData = await responseList.json();
+      this.resolvedDriveId = driveData.id;
+      return this.resolvedDriveId;
+    }
+
+    // Fallback: listar todos os drives e buscar pelo nome ou url
     const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/drives`;
     const response = await fetch(url, {
       headers: { 'Authorization': `Bearer ${token}` }
