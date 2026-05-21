@@ -147,11 +147,18 @@ const Metas = {
     const isAdmin = session.id === 'admin' || session.nivel === 'Admin';
     
     // Security check: if currentArea is set but user is not authorized to see it, clear it
-    if (this.currentArea && this.currentArea !== 'todas' && this.currentArea !== 'all') {
-      const authorizedIds = DataStore.getAuthorizedAreas().map(a => a.id);
-      if (!isAdmin && !authorizedIds.includes(this.currentArea)) {
-        this.currentArea = '';
-        localStorage.removeItem('metas_filter_area');
+    if (this.currentArea) {
+      if (this.currentArea === 'todas' || this.currentArea === 'all') {
+        if (!isAdmin) {
+          this.currentArea = '';
+          localStorage.removeItem('metas_filter_area');
+        }
+      } else {
+        const authorizedIds = DataStore.getAuthorizedAreas().map(a => a.id);
+        if (!isAdmin && !authorizedIds.includes(this.currentArea)) {
+          this.currentArea = '';
+          localStorage.removeItem('metas_filter_area');
+        }
       }
     }
 
@@ -159,17 +166,9 @@ const Metas = {
 
     let metas = DataStore.getMetas();
     
-    // Filter by area — includes the selected area and all its sub-areas
+    // Filter by area — includes only the selected area
     if (this.currentArea !== 'todas' && this.currentArea !== 'all') {
-      const selectedArea = DataStore.getAreaById(this.currentArea);
-      // Área raiz (corporativa, sem parentId): mostrar apenas metas diretamente nessa área
-      if (selectedArea && !selectedArea.parentId) {
-        metas = metas.filter(m => m.areaId === this.currentArea);
-      } else {
-        // Demais áreas: incluir sub-áreas
-        const visibleAreaIds = DataStore.getVisibleAreaIds(this.currentArea);
-        metas = metas.filter(m => visibleAreaIds.includes(m.areaId));
-      }
+      metas = metas.filter(m => m.areaId === this.currentArea);
     }
 
     let filtered = metas.filter(m => {

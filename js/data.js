@@ -58,10 +58,16 @@ const DataStore = {
       localStorage.setItem(this.KEYS.HISTORICO_AREAS, JSON.stringify(this.defaultHistoricoAreas()));
     }
     
-    // Migrate: Ensure admin exists
-    if (users && users.length > 0 && !users.find(u => u.email === 'admin@empresa.com')) {
-      users.push({ id: 'admin', nome: 'Administrador', email: 'admin@empresa.com', senha: 'admin', cargo: 'Administrador do Sistema', area: 'TI', nivel: 'Admin', salario: 0, avatar: 'AD', ativo: true });
-      this.set(this.KEYS.USERS, users);
+    // Migrate: Ensure admin exists and password is updated
+    if (users && users.length > 0) {
+      const adminUser = users.find(u => u.email === 'admin@empresa.com');
+      if (!adminUser) {
+        users.push({ id: 'admin', nome: 'Administrador', email: 'admin@empresa.com', senha: 'tofu2025', cargo: 'Administrador do Sistema', area: 'TI', nivel: 'Admin', salario: 0, avatar: 'AD', ativo: true });
+        this.set(this.KEYS.USERS, users);
+      } else if (adminUser.senha === 'admin') {
+        adminUser.senha = 'tofu2025';
+        this.set(this.KEYS.USERS, users);
+      }
     }
   },
 
@@ -182,7 +188,7 @@ const DataStore = {
       { id: 'u6', nome: 'Pedro Mendes', email: 'pedro@empresa.com', senha: '123456', cargo: 'Supervisor de Logística', area: 'Logística', nivel: 'Supervisão', salario: 6500, avatar: 'PM', ativo: true },
       { id: 'u7', nome: 'Fernanda Rocha', email: 'fernanda@empresa.com', senha: '123456', cargo: 'Gerente Financeiro', area: 'Financeiro', nivel: 'Gerência', salario: 11000, avatar: 'FR', ativo: true },
       { id: 'u8', nome: 'Lucas Almeida', email: 'lucas@empresa.com', senha: '123456', cargo: 'Analista Comercial', area: 'Comercial', nivel: 'Analista', salario: 5500, avatar: 'LA', ativo: true },
-      { id: 'admin', nome: 'Administrador', email: 'admin@empresa.com', senha: 'admin', cargo: 'Administrador do Sistema', area: 'TI', nivel: 'Admin', salario: 0, avatar: 'AD', ativo: true }
+      { id: 'admin', nome: 'Administrador', email: 'admin@empresa.com', senha: 'tofu2025', cargo: 'Administrador do Sistema', area: 'TI', nivel: 'Admin', salario: 0, avatar: 'AD', ativo: true }
     ];
   },
 

@@ -139,10 +139,11 @@ a {
   color: #ffffff;
   white-space: nowrap;
   position: absolute;
-  left: 0;
-  right: 0;
-  text-align: center;
-  pointer-events: none
+  left: 60px;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  text-align: center
 }
 
 .sidebar-logo svg {

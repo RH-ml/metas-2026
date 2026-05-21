@@ -49,7 +49,9 @@ const Auth = {
   logout() {
     localStorage.removeItem('mp_session');
     localStorage.removeItem('metas_filter_area');
+    localStorage.removeItem('dash_filter_area');
     if (typeof Metas !== 'undefined') Metas.currentArea = '';
+    if (typeof Dashboard !== 'undefined') Dashboard.currentArea = '';
     App.navigate('login');
   },
 
@@ -116,6 +118,7 @@ const Auth = {
     if (result.success) {
       Components.toast('Login realizado com sucesso!', 'success');
       localStorage.removeItem('metas_filter_area'); // Force clear area on login
+      localStorage.removeItem('dash_filter_area');
       App.navigate('dashboard');
     } else {
       const errEl = document.getElementById('loginError');
@@ -152,6 +155,7 @@ const Auth = {
         };
         localStorage.setItem('mp_session', JSON.stringify(session));
         localStorage.removeItem('metas_filter_area'); // Force clear area on login
+        localStorage.removeItem('dash_filter_area');
         
         Components.toast('Login com Microsoft realizado!', 'success');
         App.navigate('dashboard');
