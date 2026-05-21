@@ -197,7 +197,12 @@ const Metas = {
        }
        if (Array.isArray(c.composicao)) {
            c.composicao.forEach(comp => {
-               const filha = metas.find(m => String(m.id) === String(comp.metaId));
+               // Busca direta pelo ID
+               let filha = metas.find(m => String(m.id) === String(comp.metaId));
+               // Se não encontrou, busca meta compartilhada que referencia a original
+               if (!filha) {
+                   filha = metas.find(m => m.tipo === 'compartilhada' && String(m.refMetaId) === String(comp.metaId));
+               }
                if (filha && !addedIds.has(filha.id)) {
                    filha.isSubMeta = true; 
                    orderedMetas.push(filha);
@@ -625,7 +630,7 @@ const Metas = {
     const container = document.getElementById('extraFieldsContainer');
     const metaId = window._tempEditId;
     const meta = metaId ? DataStore.getMetaById(metaId) : null;
-    const allMetas = DataStore.getMetas().filter(m => m.id !== metaId && m.tipo === 'individual');
+    const allMetas = DataStore.getMetas().filter(m => m.id !== metaId && m.tipo !== 'composta');
     const users = DataStore.getUsers();
 
     const inputPeso = document.getElementById('metaPeso');
@@ -662,7 +667,7 @@ const Metas = {
       `;
       this.validateComposicao();
     } else if (tipo === 'compartilhada') {
-      const allMetas = DataStore.getMetas().filter(m => m.id !== metaId && m.tipo !== 'compartilhada');
+      const allMetas = DataStore.getMetas().filter(m => m.id !== metaId && m.tipo === 'individual');
       container.innerHTML = `
         <div class="form-group">
           <label class="form-label">Vincular a Meta de Origem *</label>
@@ -706,7 +711,7 @@ const Metas = {
   addComposicaoRow() {
     const list = document.getElementById('composicaoList');
     const index = list.children.length;
-    const allMetas = DataStore.getMetas().filter(m => m.id !== window._tempEditId && m.tipo === 'individual');
+    const allMetas = DataStore.getMetas().filter(m => m.id !== window._tempEditId && m.tipo !== 'composta');
     const div = document.createElement('div');
     div.className = 'composicao-row';
     div.style = 'display:flex; gap:8px; align-items:center;';
