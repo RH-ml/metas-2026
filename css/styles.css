@@ -129,14 +129,20 @@ a {
   display: flex;
   align-items: center;
   gap: 12px;
-  border-bottom: 1px solid rgba(0, 0, 0, .08)
+  border-bottom: 1px solid rgba(0, 0, 0, .08);
+  position: relative
 }
 
 .sidebar-brand-text {
   font-size: 1.25rem;
   font-weight: 700;
   color: #ffffff;
-  white-space: nowrap
+  white-space: nowrap;
+  position: absolute;
+  left: 0;
+  right: 0;
+  text-align: center;
+  pointer-events: none
 }
 
 .sidebar-logo svg {
