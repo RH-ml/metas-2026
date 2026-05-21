@@ -27,14 +27,14 @@ const Metas = {
     });
 
     const pesoTotal = validMetas.reduce((s, m) => {
-      // Se a meta for filha de outra meta na lista, o peso dela é ignorado (0)
-      const pesoEfetivo = childIds.has(m.id) ? 0 : (m.peso || 0);
+      // Se a meta for filha de outra meta na lista, ou for compartilhada, o peso dela é ignorado (0)
+      const pesoEfetivo = childIds.has(m.id) || m.tipo === 'compartilhada' ? 0 : (m.peso || 0);
       return s + pesoEfetivo;
     }, 0);
 
     const notaGlobal = pesoTotal > 0 ? validMetas.reduce((s, m) => {
       const p = DataStore.calcPerformance(m);
-      const pesoEfetivo = childIds.has(m.id) ? 0 : (m.peso || 0);
+      const pesoEfetivo = childIds.has(m.id) || m.tipo === 'compartilhada' ? 0 : (m.peso || 0);
       return s + (p * pesoEfetivo);
     }, 0) / pesoTotal : 0;
 
@@ -652,7 +652,25 @@ const Metas = {
     const inputPeso = document.getElementById('metaPeso');
     const labelPeso = document.getElementById('metaPesoLabel');
 
-    if (tipo === 'compartilhada') {
+          if (tipo === 'compartilhada') {
+        if (inputPeso) {
+          inputPeso.required = false;
+          inputPeso.min = "0";
+        }
+        if (labelPeso) labelPeso.textContent = 'Peso (%)';
+      } else if (tipo === 'individual') {
+        // Peso opcional para metas individuais (incluindo as que serão compartilhadas)
+        if (inputPeso) {
+          inputPeso.required = false;
+          inputPeso.min = "0";
+        }
+        if (labelPeso) labelPeso.textContent = 'Peso (%)';
+      } else {
+        if (inputPeso) {
+          inputPeso.required = true;
+        }
+        if (labelPeso) labelPeso.textContent = 'Peso (%) *';
+      }
       if (inputPeso) {
         inputPeso.required = false;
         inputPeso.min = "0";
@@ -665,7 +683,46 @@ const Metas = {
       if (labelPeso) labelPeso.textContent = 'Peso (%) *';
     }
 
-    if (tipo === 'individual') {
+          if (tipo === 'individual') {
+        // Individual metas: peso opcional, exibe campos de curva, observações e base metas
+        container.style.display = 'block';
+        // Render apenas os campos que são relevantes para metas individuais
+        container.innerHTML = `
+          <div class="form-group form-full">
+            <label class="form-label">Tipo de Curva</label>
+            <select class="form-input" name="tipoCurva" id="metaTipoCurva" onchange="Metas.renderCurvaInputs()">
+              <option value="0-80-100-120" ${meta && meta.tipoCurva === '0-80-100-120' ? 'selected' : ''}>0 - 80 - 100 - 120</option>
+              <option value="80-100-120" ${meta && meta.tipoCurva === '80-100-120' ? 'selected' : ''}>80 - 100 - 120</option>
+              <option value="80-100" ${meta && meta.tipoCurva === '80-100' ? 'selected' : ''}>80 - 100</option>
+              <option value="100" ${meta && meta.tipoCurva === '100' ? 'selected' : ''}>100 (Atingiu ou não)</option>
+            </select>
+          </div>
+          <div class="form-group form-full">
+            <label class="form-label">Valores da Curva</label>
+            <div id="curvaInputsContainer" style="display:flex; gap:12px; align-items:center; background:var(--bg-2); padding:12px; border-radius:var(--radius-sm); border:1px solid rgba(255,255,255,0.06);"></div>
+          </div>
+          <div class="form-group form-full">
+            <label class="form-label">Observações</label>
+            <textarea class="form-input" name="observacoes" rows="3" placeholder="Detalhe a regra de cálculo da meta e o que foi considerado...">${meta && meta.observacoes ? meta.observacoes : ''}</textarea>
+          </div>
+          <div class="form-group form-full">
+            <label class="form-label">Base Metas</label>
+            ${meta && meta.anexoRegra ? `
+              <div style="margin-bottom: 8px; font-size: 0.85rem;">
+                <strong>Arquivo atual:</strong> <a href="${meta.anexoRegra.url}" target="_blank" style="color:var(--primary);">${meta.anexoRegra.nome}</a>
+              </div>
+            ` : ''}
+            <input type="file" class="form-input" id="metaAnexoRegra" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg">
+          </div>
+        `;
+        // Para metas individuais o peso não é obrigatório
+        if (inputPeso) {
+          inputPeso.required = false;
+          inputPeso.min = "0";
+        }
+        return;
+      }
+
       container.style.display = 'none';
       if (inputPeso) inputPeso.min = "0";
       return;
@@ -838,11 +895,11 @@ const Metas = {
     }
     
     // Extract Curve Values
-    const tipoCurva = data.tipoCurva;
+    const tipoCurva = data.tipoCurva || '0-80-100-120';
     const points = tipoCurva.split('-');
     const valoresCurva = {};
     points.forEach(p => {
-      valoresCurva[p] = parseFloat(data[`curva_${p}`]);
+      valoresCurva[p] = parseFloat(data[`curva_${p}`]) || 0;
       delete data[`curva_${p}`]; // remove from main data object
     });
     
@@ -943,6 +1000,9 @@ const Metas = {
     }
     Components.closeModal();
     App.refreshPage();
+    } catch (err) {
+      console.error("Erro ao salvar meta:", err);
+      Components.toast('Ocorreu um erro ao salvar a meta. Verifique os dados e tente novamente.', 'error');
     } finally {
       const submitBtn = document.querySelector('.modal-footer button.btn-primary');
       if (submitBtn) submitBtn.disabled = false;
