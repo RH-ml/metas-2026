@@ -69,6 +69,27 @@ const DataStore = {
         this.set(this.KEYS.USERS, users);
       }
     }
+
+    // Forçar recalculo global para garantir que os bugfixes recentes retroajam sobre os dados históricos
+    this.globalRecalcMetas();
+  },
+
+  globalRecalcMetas() {
+    let metas = this.getMetas();
+    if (!metas || metas.length === 0) return;
+
+    // Passo 1: Recalcula todas as metas Individuais e Compartilhadas primeiro
+    metas.filter(m => m.tipo !== 'composta').forEach(m => {
+      if (m.mesesData) this.recalcMesesData(m);
+    });
+    this.set(this.KEYS.METAS, metas);
+
+    // Passo 2: Recalcula as metas Compostas (que agora lerão as notas corrigidas das filhas do banco)
+    metas = this.getMetas();
+    metas.filter(m => m.tipo === 'composta').forEach(m => {
+      if (m.mesesData) this.recalcMesesData(m);
+    });
+    this.set(this.KEYS.METAS, metas);
   },
 
   async seedFirebaseDatabase() {
@@ -279,7 +300,11 @@ const DataStore = {
       if (!m.tipo) m.tipo = 'individual';
       if (!m.status) m.status = 'nao_iniciada';
       // Migração: garante que tipoCurva e valorAlvo estejam sempre presentes
-      // (metas salvas com bug não tinham tipoCurva → calcPerformance retornava null → Nota "—")
+      // E limpa curvas corrompidas (salvas como 0,0,0,0 durante o bug) para usar o fallback
+      if (m.valoresCurva && m.valoresCurva['100'] === 0 && m.valoresCurva['80'] === 0 && m.valoresCurva['120'] === 0) {
+          delete m.valoresCurva;
+          delete m.tipoCurva;
+      }
       if (!m.tipoCurva) m.tipoCurva = '0-80-100-120';
       if (!m.valorAlvo && m.valoresCurva && m.valoresCurva['100']) {
         m.valorAlvo = parseFloat(m.valoresCurva['100']) || 0;
@@ -431,7 +456,7 @@ const DataStore = {
        if (rVal !== null && rVal !== undefined && rVal !== '' && !isNa) {
           // Só calcula a nota padrão se NÃO for meta composta (que já recebeu a nota ponderada acima)
           if (meta.tipo !== 'composta') {
-             m.pontual.nota = this.calcPerformance({...meta, valorAlvo: pVal, valorAtual: rVal});
+             m.pontual.nota = this.calcPerformance({...meta, valorAlvo: pVal, valorAtual: rVal}, true);
           }
           m.pontual.d = calcDesvio(rVal, pVal);
        } else {
@@ -509,7 +534,7 @@ const DataStore = {
            } else if (meta.acumulacao === 'repetir') {
               m.acumulado.nota = m.pontual.nota;
            } else {
-              m.acumulado.nota = this.calcPerformance({...meta, valorAlvo: curAcumP, valorAtual: curAcumR});
+              m.acumulado.nota = this.calcPerformance({...meta, valorAlvo: curAcumP, valorAtual: curAcumR}, true);
            }
         } else {
            m.acumulado.r = null;
@@ -544,11 +569,12 @@ const DataStore = {
   getRegras() { return this.get(this.KEYS.REGRAS); },
   getBonusByPeriodo(periodo) { return this.get(this.KEYS.BONUS).filter(b => b.periodo === periodo); },
 
-  calcPerformance(meta) {
+  calcPerformance(meta, _isRawCalc = false) {
     if (!meta) return null;
     
     // Se for meta composta, compartilhada ou repetir, a performance é a nota já calculada no último mês válido
-    if (meta.tipo === 'composta' || meta.tipo === 'compartilhada' || meta.acumulacao === 'repetir') {
+    // (a menos que estejamos fazendo o cálculo matemático base do mês, indicado por _isRawCalc)
+    if (!_isRawCalc && (meta.tipo === 'composta' || meta.tipo === 'compartilhada' || meta.acumulacao === 'repetir')) {
        if (!meta.mesesData) return null;
        // Encontrar o último mês que tem nota (não N/A)
        for (let i = meta.mesesData.length - 1; i >= 0; i--) {
