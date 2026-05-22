@@ -179,38 +179,31 @@ const Metas = {
     let areaMetas = [];
     if (this.currentArea && this.currentArea !== 'todas' && this.currentArea !== 'all') {
       areaMetas = metas.filter(m => {
-        // Se for meta compartilhada, ela NUNCA aparece por causa do seu areaId original.
-        // Ela SÓ aparece se tiver sido compartilhada com alguém da área selecionada
-        // (ou sub-área dela), OU se o responsável principal pertencer à área selecionada.
+        // Se for meta compartilhada, ela SÓ aparece na área EXATA do correspónsavel.
+        // NÃO aparece na área do responsável original (onde já existe a meta-mãe),
+        // nem em áreas pai (ex: Diretoria) — apenas na área de responsabilidade direta.
         if (m.tipo === 'compartilhada') {
-          // Obtém os IDs da área selecionada e todas as suas sub-áreas
-          const visibleIds = DataStore.getVisibleAreaIds(this.currentArea);
-          
-          // Verifica se algum correspónsavel pertence à área selecionada (ou sub-área)
           if (Array.isArray(m.coresponsavelIds) && m.coresponsavelIds.length > 0) {
-            const matchByCoResp = m.coresponsavelIds.some(uid => {
-               const uArea = DataStore.getAreaAtual(uid);
-               return uArea && visibleIds.includes(uArea.id);
+            return m.coresponsavelIds.some(uid => {
+              const uArea = DataStore.getAreaAtual(uid);
+              return uArea && uArea.id === this.currentArea;
             });
-            if (matchByCoResp) return true;
           }
-          
-          // Fallback: verifica se o responsável principal pertence à área selecionada
-          if (m.responsavelId) {
-            const respArea = DataStore.getAreaAtual(m.responsavelId);
-            if (respArea && visibleIds.includes(respArea.id)) return true;
-          }
-          
           return false;
         }
-        // Para metas normais, prioriza a área atual do responsável para evitar metas órfãs de área
+        // Para metas normais: a área ATUAL do responsável é a fonte autoritativa.
+        // Se getAreaAtual retornar uma área, esse resultado é FINAL (não cai no fallback).
+        // O fallback de areaId só é usado quando o responsável não tem histórico de área.
         if (m.responsavelId) {
-            const respArea = DataStore.getAreaAtual(m.responsavelId);
-            if (respArea) {
-                return respArea.id === this.currentArea;
-            }
+          const respArea = DataStore.getAreaAtual(m.responsavelId);
+          if (respArea) {
+            // Encontrou a área atual → resultado definitivo, sem fallback
+            return respArea.id === this.currentArea;
+          }
+          // Sem historico_areas: usa areaId salvo na meta como último recurso
+          return m.areaId === this.currentArea;
         }
-        // Fallback
+        // Meta sem responsável: usa areaId salvo
         return m.areaId === this.currentArea;
       });
     } else {
