@@ -857,6 +857,7 @@ const Metas = {
       delete data[`curva_${p}`]; // remove from main data object
     });
     
+    data.tipoCurva = tipoCurva;   // Garante que tipoCurva seja sempre salvo corretamente
     data.valoresCurva = valoresCurva;
     data.peso = pesoInput;
     

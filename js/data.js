@@ -278,6 +278,12 @@ const DataStore = {
       if (!m.codigo) m.codigo = `MET${(index + 1).toString().padStart(4, '0')}`;
       if (!m.tipo) m.tipo = 'individual';
       if (!m.status) m.status = 'nao_iniciada';
+      // Migração: garante que tipoCurva e valorAlvo estejam sempre presentes
+      // (metas salvas com bug não tinham tipoCurva → calcPerformance retornava null → Nota "—")
+      if (!m.tipoCurva) m.tipoCurva = '0-80-100-120';
+      if (!m.valorAlvo && m.valoresCurva && m.valoresCurva['100']) {
+        m.valorAlvo = parseFloat(m.valoresCurva['100']) || 0;
+      }
       
       // Sempre resolve a área atual do responsável para garantir que o filtro funcione
       if (m.responsavelId) {
