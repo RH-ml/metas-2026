@@ -58,10 +58,9 @@ const Auth = {
   getUserRootAreaId() {
     const session = this.getSession();
     if (!session) return null;
-    // Admin tem acesso total a todas as áreas
-    if (session.id === 'admin' || session.nivel === 'Admin') return 'all';
-    // Diretoria e demais: retorna sua própria área
-    // (DataStore.getAuthorizedAreas adicionará a área corporativa para diretores)
+    // Admin e Diretoria têm acesso total para visualizar todas as áreas
+    if (session.id === 'admin' || session.nivel === 'Admin' || session.nivel === 'Diretoria') return 'all';
+    // Gerência e demais: retorna sua própria área
     const area = DataStore.getAreaAtual(session.id);
     return area ? area.id : null;
   },

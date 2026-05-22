@@ -340,12 +340,10 @@ const DataStore = {
         m.valorAlvo = parseFloat(m.valoresCurva['100']) || 0;
       }
       
-      // Resolve a área atual do responsável para garantir que o filtro funcione.
-      // Estratégia em cascata:
-      // 1. Tenta via historico_areas (registro oficial de área do usuário)
-      // 2. Se não encontrar, busca o campo 'areaId' direto no cadastro do usuário
-      // 3. Se ainda não encontrar, mantém o areaId que já estava salvo na meta
-      if (m.responsavelId) {
+      // Resolve a área atual do responsável APENAS SE a meta não possuir areaId salva,
+      // ou para garantir integridade caso a meta perca sua área.
+      // O usuário pode ter metas associadas a áreas diferentes do seu setor atual.
+      if (!m.areaId && m.responsavelId) {
         const areaObj = this.getAreaAtual(m.responsavelId);
         if (areaObj) {
           m.areaId = areaObj.id; // ✅ Fonte principal: historico_areas
@@ -355,7 +353,6 @@ const DataStore = {
           if (user && user.areaId) {
             m.areaId = user.areaId;
           }
-          // Se ainda não tem, mantém o m.areaId original (salvo na meta)
         }
       }
       

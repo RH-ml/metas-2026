@@ -145,39 +145,79 @@ const Metas = {
   getFilteredMetas() {
     const session = Auth.getSession() || {};
     const isAdmin = session.id === 'admin' || session.nivel === 'Admin';
+    const isDiretoria = session.nivel === 'Diretoria';
     
+    // Se não há área selecionada, define como a área do próprio usuário por padrão
+    if (!this.currentArea) {
+       const userArea = DataStore.getAreaAtual(session.id);
+       if (userArea) {
+          this.currentArea = userArea.id;
+          localStorage.setItem('metas_filter_area', this.currentArea);
+       } else if (isAdmin) {
+          this.currentArea = 'todas';
+       }
+    }
+
     // Security check: if currentArea is set but user is not authorized to see it, clear it
-    // If no specific area is set, show all metas (handled later)
     if (this.currentArea === 'todas' || this.currentArea === 'all') {
-      if (!isAdmin) {
+      if (!isAdmin && !isDiretoria) {
         this.currentArea = '';
         localStorage.removeItem('metas_filter_area');
       }
     } else if (this.currentArea) {
       const authorizedIds = DataStore.getAuthorizedAreas().map(a => a.id);
-      if (!isAdmin && !authorizedIds.includes(this.currentArea)) {
+      if (!isAdmin && !isDiretoria && !authorizedIds.includes(this.currentArea)) {
         this.currentArea = '';
         localStorage.removeItem('metas_filter_area');
       }
     }
 
-    // Retrieve all metas, but optionally exclude shared metas from the list
     let metas = DataStore.getMetas();
-    // Exclude shared metas only for display purposes (they are shown via sharing logic elsewhere)
-    metas = metas.filter(m => m.tipo !== 'compartilhada');
     
-    // If a specific area is selected, filter by that area; otherwise show all metas
+    // Se houver área selecionada, filtra por EXATO, mas inclui metas compartilhadas
+    // onde o corresponsável pertença a esta área.
     let areaMetas = [];
     if (this.currentArea && this.currentArea !== 'todas' && this.currentArea !== 'all') {
-      // ✅ Usa getVisibleAreaIds para incluir a área selecionada e TODAS as suas sub-áreas
-      const visibleAreaIds = DataStore.getVisibleAreaIds(this.currentArea);
-      areaMetas = metas.filter(m => visibleAreaIds.includes(m.areaId));
+      areaMetas = metas.filter(m => {
+        // Se for meta compartilhada, ela NUNCA aparece por causa do seu areaId original.
+        // Ela SÓ aparece se tiver sido compartilhada com alguém da área selecionada
+        // (ou sub-área dela), OU se o responsável principal pertencer à área selecionada.
+        if (m.tipo === 'compartilhada') {
+          // Obtém os IDs da área selecionada e todas as suas sub-áreas
+          const visibleIds = DataStore.getVisibleAreaIds(this.currentArea);
+          
+          // Verifica se algum correspónsavel pertence à área selecionada (ou sub-área)
+          if (Array.isArray(m.coresponsavelIds) && m.coresponsavelIds.length > 0) {
+            const matchByCoResp = m.coresponsavelIds.some(uid => {
+               const uArea = DataStore.getAreaAtual(uid);
+               return uArea && visibleIds.includes(uArea.id);
+            });
+            if (matchByCoResp) return true;
+          }
+          
+          // Fallback: verifica se o responsável principal pertence à área selecionada
+          if (m.responsavelId) {
+            const respArea = DataStore.getAreaAtual(m.responsavelId);
+            if (respArea && visibleIds.includes(respArea.id)) return true;
+          }
+          
+          return false;
+        }
+        // Para metas normais, prioriza a área atual do responsável para evitar metas órfãs de área
+        if (m.responsavelId) {
+            const respArea = DataStore.getAreaAtual(m.responsavelId);
+            if (respArea) {
+                return respArea.id === this.currentArea;
+            }
+        }
+        // Fallback
+        return m.areaId === this.currentArea;
+      });
     } else {
-      // No specific area selected – show all metas
       areaMetas = metas;
     }
     
-    // Apply additional filters (search, status) – these were previously in getFilteredMetas
+    // Apply additional filters (search, status)
     let filtered = areaMetas.filter(m => {
       // Regra de Ouro: Metas compartilhadas (espelhos) só aparecem no painel individual do responsável.
       if (m.tipo === 'compartilhada' && (this.currentArea === 'todas' || this.currentArea === 'all')) {
@@ -706,6 +746,7 @@ const Metas = {
 
     if (tipo === 'compartilhada') {
       const available = DataStore.getMetas().filter(m => m.id !== metaId && m.tipo === 'individual');
+      const users = DataStore.getUsers().filter(u => u.status !== 'inativo');
       container.style.display = 'block';
       container.innerHTML = `
         <div class="form-group">
@@ -715,6 +756,22 @@ const Metas = {
             ${available.map(m => `<option value="${m.id}" ${meta?.refMetaId === m.id ? 'selected' : ''}>${m.codigo} - ${m.titulo}</option>`).join('')}
           </select>
           <small style="color:var(--text-3); display:block; margin-top:4px;">Nota, Curva e Resultados serão sincronizados com a origem.</small>
+        </div>
+        <div class="form-group" style="margin-top: 16px;">
+          <label class="form-label">Corresponsáveis (Quem vai receber essa meta?)</label>
+          <div style="max-height: 150px; overflow-y: auto; border: 1px solid var(--border); padding: 8px; border-radius: 6px; background: var(--bg-1);">
+            ${users.map(u => {
+              const uArea = DataStore.getAreaAtual(u.id);
+              const areaNome = uArea ? uArea.nome : 'Sem Área';
+              const checked = meta?.coresponsavelIds?.includes(u.id) ? 'checked' : '';
+              return `
+                <label style="display:flex; align-items:center; gap:8px; margin-bottom:6px; font-size:0.85rem; cursor:pointer;">
+                  <input type="checkbox" name="coresponsavel" value="${u.id}" ${checked}>
+                  <span>${u.nome} <small style="color:var(--text-3)">(${areaNome})</small></span>
+                </label>
+              `;
+            }).join('')}
+          </div>
         </div>
       `;
       return;
