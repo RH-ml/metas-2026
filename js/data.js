@@ -19,17 +19,40 @@ const DataStore = {
           console.log("🌱 Firestore vazio! Semeando banco de dados com dados padrões...");
           await this.seedFirebaseDatabase();
         } else {
-          // Caso contrário, baixa os dados das coleções e atualiza o localStorage
+          // Baixa os dados das coleções e faz merge inteligente por timestamp.
+          // REGRA ANTI-AMNÉSIA: Se o item local for mais novo que o do Firebase
+          // (ex: usuário editou mas F5 foi pressionado antes do Firebase confirmar),
+          // o item LOCAL prevalece. Isso elimina a race condition de escrita.
           for (const key of Object.values(this.KEYS)) {
             if (key === this.KEYS.SESSION) continue; // Sessão é puramente local
             const snapshot = await db.collection(key).get();
-            const list = [];
-            snapshot.forEach(doc => {
-              list.push(doc.data());
+            const fbList = [];
+            snapshot.forEach(doc => fbList.push(doc.data()));
+
+            const localList = this.get(key) || [];
+            const localMap = {};
+            localList.forEach(item => { if (item.id) localMap[item.id] = item; });
+
+            // Para cada item do Firebase, verificar se o local é mais novo
+            const mergedList = fbList.map(fbItem => {
+              const localItem = localMap[fbItem.id];
+              if (!localItem) return fbItem;
+              const fbTime = fbItem.atualizadoEm ? new Date(fbItem.atualizadoEm).getTime() : 0;
+              const localTime = localItem.atualizadoEm ? new Date(localItem.atualizadoEm).getTime() : 0;
+              if (localTime > fbTime) {
+                console.log(`⚡ Merge: item local mais novo para ${key}/${fbItem.id} — preservando edição local.`);
+                return localItem; // Local ganhou: tem dados mais recentes
+              }
+              return fbItem; // Firebase ganhou: tem dados mais recentes ou iguais
             });
-            localStorage.setItem(key, JSON.stringify(list));
+
+            // Incluir itens locais que não existem no Firebase (segurança)
+            const fbIds = new Set(fbList.map(f => f.id));
+            localList.forEach(l => { if (l.id && !fbIds.has(l.id)) mergedList.push(l); });
+
+            localStorage.setItem(key, JSON.stringify(mergedList));
           }
-          console.log("✅ Sincronização com Firebase concluída com sucesso!");
+          console.log("✅ Sincronização com Firebase concluída (merge inteligente aplicado).");
         }
       } catch (error) {
         console.error("❌ Falha ao sincronizar dados com o Firebase, usando cache local:", error);
@@ -70,8 +93,15 @@ const DataStore = {
       }
     }
 
-    // Forçar recalculo global para garantir que os bugfixes recentes retroajam sobre os dados históricos
-    this.globalRecalcMetas();
+    // Recálculo global de migração: roda UMA ÚNICA VEZ por versão de código.
+    // Garante retroatividade dos bugfixes sem sobrescrever dados válidos em cargas subsequentes.
+    const MIGRATION_KEY = 'mp_migration_recalc_v4';
+    if (!localStorage.getItem(MIGRATION_KEY)) {
+      console.log('🔧 Executando migração de dados v4 (única vez)...');
+      this.globalRecalcMetas();
+      localStorage.setItem(MIGRATION_KEY, new Date().toISOString());
+      console.log('✅ Migração v4 concluída.');
+    }
   },
 
   globalRecalcMetas() {
