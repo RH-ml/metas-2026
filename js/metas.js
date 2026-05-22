@@ -591,7 +591,37 @@ const Metas = {
             </select>
           </div>
 
-          <!-- Tipo de Curva, Valores da Curva, Observações e Base Metas são renderizados pelo handleTipoChange para metas individuais -->
+          <div class="form-group">
+            <label class="form-label">Tipo de Curva</label>
+            <select class="form-input" name="tipoCurva" id="metaTipoCurva" onchange="Metas.renderCurvaInputs()">
+              <option value="0-80-100-120" ${meta && meta.tipoCurva === '0-80-100-120' ? 'selected' : ''}>0 - 80 - 100 - 120</option>
+              <option value="80-100-120" ${meta && meta.tipoCurva === '80-100-120' ? 'selected' : ''}>80 - 100 - 120</option>
+              <option value="80-100" ${meta && meta.tipoCurva === '80-100' ? 'selected' : ''}>80 - 100</option>
+              <option value="100" ${meta && meta.tipoCurva === '100' ? 'selected' : ''}>100 (Atingiu ou não)</option>
+            </select>
+          </div>
+
+          <div class="form-group form-full">
+            <label class="form-label">Valores da Curva</label>
+            <div id="curvaInputsContainer" style="display:flex; gap:12px; align-items:center; background:var(--bg-2); padding:12px; border-radius:var(--radius-sm); border:1px solid rgba(255,255,255,0.06);">
+              <!-- Renderizado dinamicamente por renderCurvaInputs() -->
+            </div>
+          </div>
+
+          <div class="form-group form-full">
+            <label class="form-label">Observações</label>
+            <textarea class="form-input" name="observacoes" rows="3" placeholder="Detalhe a regra de cálculo da meta e o que foi considerado...">${meta && meta.observacoes ? meta.observacoes : ''}</textarea>
+          </div>
+
+          <div class="form-group form-full">
+            <label class="form-label">Base Metas</label>
+            ${meta && meta.anexoRegra ? `
+              <div style="margin-bottom: 8px; font-size: 0.85rem;">
+                <strong>Arquivo atual:</strong> <a href="${meta.anexoRegra.url}" target="_blank" style="color:var(--primary);">${meta.anexoRegra.nome}</a>
+              </div>
+            ` : ''}
+            <input type="file" class="form-input" id="metaAnexoRegra" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg">
+          </div>
 
 
         </div>
@@ -643,35 +673,8 @@ const Metas = {
     }
 
     if (tipo === 'individual') {
-      container.style.display = 'block';
-      container.innerHTML = `
-        <div class="form-group form-full">
-          <label class="form-label">Tipo de Curva</label>
-          <select class="form-input" name="tipoCurva" id="metaTipoCurva" onchange="Metas.renderCurvaInputs()">
-            <option value="0-80-100-120" ${meta && meta.tipoCurva === '0-80-100-120' ? 'selected' : ''}>0 - 80 - 100 - 120</option>
-            <option value="80-100-120" ${meta && meta.tipoCurva === '80-100-120' ? 'selected' : ''}>80 - 100 - 120</option>
-            <option value="80-100" ${meta && meta.tipoCurva === '80-100' ? 'selected' : ''}>80 - 100</option>
-            <option value="100" ${meta && meta.tipoCurva === '100' ? 'selected' : ''}>100 (Atingiu ou não)</option>
-          </select>
-        </div>
-        <div class="form-group form-full">
-          <label class="form-label">Valores da Curva</label>
-          <div id="curvaInputsContainer" style="display:flex; gap:12px; align-items:center; background:var(--bg-2); padding:12px; border-radius:var(--radius-sm); border:1px solid rgba(255,255,255,0.06);"></div>
-        </div>
-        <div class="form-group form-full">
-          <label class="form-label">Observações</label>
-          <textarea class="form-input" name="observacoes" rows="3" placeholder="Detalhe a regra de cálculo da meta e o que foi considerado...">${meta && meta.observacoes ? meta.observacoes : ''}</textarea>
-        </div>
-        <div class="form-group form-full">
-          <label class="form-label">Base Metas</label>
-          ${meta && meta.anexoRegra ? `
-            <div style="margin-bottom:8px;font-size:0.85rem;">
-              <strong>Arquivo atual:</strong> <a href="${meta.anexoRegra.url}" target="_blank" style="color:var(--primary);">${meta.anexoRegra.nome}</a>
-            </div>` : ''}
-          <input type="file" class="form-input" id="metaAnexoRegra" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg">
-        </div>
-      `;
-      this.renderCurvaInputs();
+      // Campos de curva, observações e base metas já estão no HTML estático do formulário
+      container.style.display = 'none';
       return;
     }
 
