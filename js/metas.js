@@ -1018,7 +1018,7 @@ const Metas = {
           monthObj[dataKey].na = false;
           if (field === 'r') monthObj[dataKey].r = null;
           DataStore.recalcMesesData(m);
-          DataStore.set(DataStore.KEYS.METAS, metas);
+          DataStore.update(DataStore.KEYS.METAS, m.id, m);
           this.recalcParentMetas(metaId);
           Components.toast('N/A removido.', 'info');
           App.refreshPage();
@@ -1050,7 +1050,7 @@ const Metas = {
         monthObj[dataKey].na = true;
       }
       DataStore.recalcMesesData(m);
-      DataStore.set(DataStore.KEYS.METAS, metas);
+      DataStore.update(DataStore.KEYS.METAS, m.id, m);
       this.recalcParentMetas(metaId);
       Components.toast('Apontamento salvo como N/A.', 'success');
       App.refreshPage();
@@ -1080,7 +1080,7 @@ const Metas = {
     if (field === 'r') monthObj[dataKey].na = false;
 
     DataStore.recalcMesesData(m);
-    DataStore.set(DataStore.KEYS.METAS, metas);
+    DataStore.update(DataStore.KEYS.METAS, m.id, m);
     this.recalcParentMetas(metaId);
 
     // Sincronizar se for compartilhada
@@ -1095,18 +1095,14 @@ const Metas = {
 
   recalcParentMetas(childId) {
     let metas = DataStore.getMetas();
-    let parentFound = false;
     metas.forEach(m => {
       if (m.tipo === 'composta' && Array.isArray(m.composicao)) {
         if (m.composicao.some(c => c.metaId === childId)) {
           DataStore.recalcMesesData(m);
-          parentFound = true;
+          DataStore.update(DataStore.KEYS.METAS, m.id, m);
         }
       }
     });
-    if (parentFound) {
-      DataStore.set(DataStore.KEYS.METAS, metas);
-    }
   },
 
   syncResultToSource(sourceId, mes, valueStr) {
@@ -1124,7 +1120,7 @@ const Metas = {
               monthObj.pontual.na = false;
            }
            DataStore.recalcMesesData(m);
-           DataStore.set(DataStore.KEYS.METAS, metas);
+           DataStore.update(DataStore.KEYS.METAS, m.id, m);
            // Se a origem for filha de outra composta, recalcula a hierarquia
            this.recalcParentMetas(sourceId);
         }
