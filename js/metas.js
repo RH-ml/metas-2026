@@ -535,7 +535,7 @@ const Metas = {
             </select>
           </div>
           
-          <div class="form-group">
+          <div class="form-group" id="metaPesoGroup">
             <label class="form-label" id="metaPesoLabel">Peso (%) *</label>
             <input class="form-input" type="number" step="0.01" min="0" max="100" id="metaPeso" name="peso" value="${meta ? meta.peso : 10}" required oninput="Metas.updatePesoProgress()">
           </div>
@@ -591,38 +591,8 @@ const Metas = {
             </select>
           </div>
 
-          <div class="form-group">
-            <label class="form-label">Tipo de Curva</label>
-            <select class="form-input" name="tipoCurva" id="metaTipoCurva" onchange="Metas.renderCurvaInputs()">
-              <option value="0-80-100-120" ${meta && meta.tipoCurva === '0-80-100-120' ? 'selected' : ''}>0 - 80 - 100 - 120</option>
-              <option value="80-100-120" ${meta && meta.tipoCurva === '80-100-120' ? 'selected' : ''}>80 - 100 - 120</option>
-              <option value="80-100" ${meta && meta.tipoCurva === '80-100' ? 'selected' : ''}>80 - 100</option>
-              <option value="100" ${meta && meta.tipoCurva === '100' ? 'selected' : ''}>100 (Atingiu ou não)</option>
-            </select>
-          </div>
+          <!-- Tipo de Curva, Valores da Curva, Observações e Base Metas são renderizados pelo handleTipoChange para metas individuais -->
 
-          <div class="form-group form-full">
-            <label class="form-label">Valores da Curva</label>
-            <div id="curvaInputsContainer" style="display:flex; gap:12px; align-items:center; background:var(--bg-2); padding:12px; border-radius:var(--radius-sm); border:1px solid rgba(255,255,255,0.06);">
-              <!-- Renderizado dinamicamente -->
-            </div>
-          </div>
-          
-          <div class="form-group form-full">
-            <label class="form-label">Observações</label>
-            <textarea class="form-input" name="observacoes" rows="3" placeholder="Detalhe a regra de cálculo da meta e o que foi considerado...">${meta && meta.observacoes ? meta.observacoes : ''}</textarea>
-          </div>
-          
-          <div class="form-group form-full">
-            <label class="form-label">Base Metas</label>
-            ${meta && meta.anexoRegra ? `
-              <div style="margin-bottom: 8px; font-size: 0.85rem;">
-                <strong>Arquivo atual:</strong> <a href="${meta.anexoRegra.url}" target="_blank" style="color:var(--primary);">${meta.anexoRegra.nome}</a>
-              </div>
-            ` : ''}
-            <input type="file" class="form-input" id="metaAnexoRegra" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg">
-          </div>
-          
 
         </div>
       </form>`;
@@ -654,14 +624,22 @@ const Metas = {
 
     const inputPeso = document.getElementById('metaPeso');
     const labelPeso = document.getElementById('metaPesoLabel');
+    const grupoPeso = document.getElementById('metaPesoGroup');
 
-    // Peso: obrigatório apenas para composta
-    if (tipo === 'composta') {
-      if (inputPeso) { inputPeso.required = true; inputPeso.min = "1"; }
-      if (labelPeso) labelPeso.textContent = 'Peso (%) *';
-    } else {
+    // Peso: obrigatório para individual e composta; opcional (e oculto) para compartilhada
+    if (tipo === 'compartilhada') {
       if (inputPeso) { inputPeso.required = false; inputPeso.min = "0"; }
       if (labelPeso) labelPeso.textContent = 'Peso (%)';
+      if (grupoPeso) grupoPeso.style.display = 'none';
+    } else if (tipo === 'composta') {
+      if (inputPeso) { inputPeso.required = true; inputPeso.min = "1"; }
+      if (labelPeso) labelPeso.textContent = 'Peso (%) *';
+      if (grupoPeso) grupoPeso.style.display = '';
+    } else {
+      // individual — peso obrigatório como era antes
+      if (inputPeso) { inputPeso.required = true; inputPeso.min = "0"; }
+      if (labelPeso) labelPeso.textContent = 'Peso (%) *';
+      if (grupoPeso) grupoPeso.style.display = '';
     }
 
     if (tipo === 'individual') {
