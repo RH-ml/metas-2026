@@ -340,10 +340,23 @@ const DataStore = {
         m.valorAlvo = parseFloat(m.valoresCurva['100']) || 0;
       }
       
-      // Sempre resolve a área atual do responsável para garantir que o filtro funcione
+      // Resolve a área atual do responsável para garantir que o filtro funcione.
+      // Estratégia em cascata:
+      // 1. Tenta via historico_areas (registro oficial de área do usuário)
+      // 2. Se não encontrar, busca o campo 'areaId' direto no cadastro do usuário
+      // 3. Se ainda não encontrar, mantém o areaId que já estava salvo na meta
       if (m.responsavelId) {
         const areaObj = this.getAreaAtual(m.responsavelId);
-        if (areaObj) m.areaId = areaObj.id;
+        if (areaObj) {
+          m.areaId = areaObj.id; // ✅ Fonte principal: historico_areas
+        } else {
+          // Fallback: busca o areaId direto no cadastro do usuário
+          const user = this.getUserById(m.responsavelId);
+          if (user && user.areaId) {
+            m.areaId = user.areaId;
+          }
+          // Se ainda não tem, mantém o m.areaId original (salvo na meta)
+        }
       }
       
       // Se não tem estrutura de meses, gera uma temporária (será salva no próximo recalc oficial)

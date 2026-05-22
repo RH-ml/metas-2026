@@ -169,7 +169,9 @@ const Metas = {
     // If a specific area is selected, filter by that area; otherwise show all metas
     let areaMetas = [];
     if (this.currentArea && this.currentArea !== 'todas' && this.currentArea !== 'all') {
-      areaMetas = metas.filter(m => m.areaId === this.currentArea);
+      // ✅ Usa getVisibleAreaIds para incluir a área selecionada e TODAS as suas sub-áreas
+      const visibleAreaIds = DataStore.getVisibleAreaIds(this.currentArea);
+      areaMetas = metas.filter(m => visibleAreaIds.includes(m.areaId));
     } else {
       // No specific area selected – show all metas
       areaMetas = metas;
