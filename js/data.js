@@ -4,6 +4,24 @@
 
 const DataStore = {
   KEYS: { USERS: 'mp_users', METAS: 'mp_metas', ACOES: 'mp_acoes', BONUS: 'mp_bonus', REGRAS: 'mp_regras', AREAS: 'mp_areas', HISTORICO_AREAS: 'mp_hist_areas', SESSION: 'mp_session' },
+  DELETED_KEY: 'mp_deleted_ids', // Tombstone: IDs excluídos intencionalmente (evita restauração pelo merge do Firebase)
+
+  // Registra um ID como excluído permanentemente
+  _registerDeleted(id) {
+    try {
+      const deleted = JSON.parse(localStorage.getItem(this.DELETED_KEY) || '{}');
+      deleted[id] = new Date().toISOString();
+      localStorage.setItem(this.DELETED_KEY, JSON.stringify(deleted));
+    } catch(e) { /* silencioso */ }
+  },
+
+  // Verifica se um ID foi excluído
+  _isDeleted(id) {
+    try {
+      const deleted = JSON.parse(localStorage.getItem(this.DELETED_KEY) || '{}');
+      return !!deleted[id];
+    } catch(e) { return false; }
+  },
 
   async init() {
     // 1. Se o Firebase estiver ativo, tenta puxar os dados atualizados da nuvem
@@ -47,10 +65,18 @@ const DataStore = {
             });
 
             // Incluir itens locais que não existem no Firebase (segurança)
+            // IMPORTANTE: Verificar tombstone — itens excluídos intencionalmente NÃO devem ser restaurados
             const fbIds = new Set(fbList.map(f => f.id));
-            localList.forEach(l => { if (l.id && !fbIds.has(l.id)) mergedList.push(l); });
+            localList.forEach(l => {
+              if (l.id && !fbIds.has(l.id) && !this._isDeleted(l.id)) {
+                mergedList.push(l);
+              }
+            });
+            
+            // Filtrar do merged qualquer item que conste nos tombstones (veio do Firebase mas foi excluído localmente)
+            const finalList = mergedList.filter(item => !this._isDeleted(item.id));
 
-            localStorage.setItem(key, JSON.stringify(mergedList));
+            localStorage.setItem(key, JSON.stringify(finalList));
           }
           console.log("✅ Sincronização com Firebase concluída (merge inteligente aplicado).");
         }
@@ -219,13 +245,26 @@ const DataStore = {
   },
  
   remove(key, id) {
+    // 1. Registrar como excluído (tombstone) ANTES de qualquer operação para garantir persistência
+    this._registerDeleted(id);
+    
     const data = this.get(key).filter(i => i.id !== id);
     this.set(key, data);
 
-    // Sincronização em background no Firebase
+    // 2. Sincronização com Firebase — aguarda confirmação e re-tenta em caso de falha
     if (isFirebaseActive && db && key !== this.KEYS.SESSION) {
-      db.collection(key).doc(id).delete()
-        .catch(e => console.error(`Erro ao deletar registro no Firebase para ${key}:`, e));
+      const attemptDelete = (retries = 3) => {
+        db.collection(key).doc(id).delete()
+          .then(() => console.log(`✅ Registro ${id} excluído do Firebase (${key}).`))
+          .catch(e => {
+            console.error(`Erro ao deletar registro no Firebase para ${key}:`, e);
+            if (retries > 0) {
+              console.log(`↩ Tentando novamente... (${retries} tentativas restantes)`);
+              setTimeout(() => attemptDelete(retries - 1), 2000);
+            }
+          });
+      };
+      attemptDelete();
     }
   },
 

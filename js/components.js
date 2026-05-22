@@ -277,16 +277,6 @@ const Components = {
             <input type="text" class="form-input" placeholder="Pesquisar áreas..." oninput="Components.filterTreeNodes(this.value)">
           </div>
           <div class="tree-container">
-            ${(Auth.getUserRootAreaId() === 'all') ? `
-              <div class="tree-node">
-                <div class="tree-row ${selectedId === 'todas' || selectedId === 'all' ? 'active' : ''}">
-                  <div class="tree-toggle empty"></div>
-                  <div class="tree-item" onclick="${onSelectName}('todas'); Components.toggleTreeSelector(false)">
-                    <span class="tree-label">Todas as Áreas</span>
-                  </div>
-                </div>
-              </div>
-            ` : ''}
             ${this.renderTreeNodes(authorizedTree, selectedId, onSelectName)}
           </div>
         </div>
