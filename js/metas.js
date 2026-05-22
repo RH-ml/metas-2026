@@ -258,12 +258,10 @@ const Metas = {
       const pVal = monthData.p;
       const rVal = monthData.r;
       if (field === 'd') {
-        if (rVal === null || rVal === undefined || rVal === '') return null;
-        return DataStore.calcDesvio(meta, rVal, pVal);
+        return monthData.d;
       }
       if (field === 'nota') {
-        if (rVal === null || rVal === undefined || rVal === '') return null;
-        return DataStore.calcPerformance({...meta, valorAlvo: pVal, valorAtual: rVal});
+        return monthData.nota;
       }
       return monthData[field];
     };
