@@ -689,6 +689,17 @@ const DataStore = {
 
         if (!Number.isNaN(score) && !Number.isNaN(val)) values.push({ score, val });
       }
+      if (values.length === 1) {
+        if (r === null || r === undefined || isNaN(r)) return null;
+        const targetVal = values[0].val;
+        const targetScore = values[0].score;
+        const isMenor = meta.polaridade === 'menor_melhor';
+        if (isMenor) {
+          return r <= targetVal ? targetScore : 0;
+        } else {
+          return r >= targetVal ? targetScore : 0;
+        }
+      }
       if (values.length < 2) return 0;
       values.sort((a, b) => a.val - b.val);
       if (r === null || r === undefined || isNaN(r)) return null;
