@@ -1,4 +1,4 @@
-// ============================================
+﻿// ============================================
 // DASHBOARD.JS — Página principal do dashboard
 // ============================================
 
@@ -175,14 +175,19 @@ const Dashboard = {
     const targetMin = parseInt(document.getElementById('gatilhoTargetRange')?.value || '80', 10);
     const areaCorpId = document.getElementById('gatilhoAreaCorp')?.value || null;
 
-    // Atualiza isGatilho nas metas (reseta todas, marca apenas as selecionadas)
+    // Atualiza isGatilho nas metas.
+    // IMPORTANTE: atualiza atualizadoEm nas metas que mudaram, garantindo que
+    // o merge Firebase/local preserve a alteração mesmo após recarregar a página.
+    const now = new Date().toISOString();
     const metas = DataStore.get(DataStore.KEYS.METAS);
     metas.forEach(m => {
-      if (selectedIds.includes(m.id)) {
-        m.isGatilho = true;
+      const novoIsGatilho = selectedIds.includes(m.id);
+      if (!!m.isGatilho !== novoIsGatilho) {
+        // Só toca no timestamp se o valor realmente mudou
+        m.isGatilho = novoIsGatilho;
+        m.atualizadoEm = now;
       } else {
-        // Remove isGatilho apenas de metas que não estão mais selecionadas
-        m.isGatilho = false;
+        m.isGatilho = novoIsGatilho;
       }
     });
     DataStore.set(DataStore.KEYS.METAS, metas);
@@ -193,6 +198,7 @@ const Dashboard = {
     Components.toast('Gatilhos atualizados com sucesso!', 'success');
     App.refreshPage();
   },
+
 
 
   render() {
@@ -278,9 +284,9 @@ const Dashboard = {
             <div class="card">
               <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
                 <h3 class="card-title">Gatilhos do Programa</h3>
-                <button class="btn-icon" title="Editar Gatilhos" onclick="Dashboard.openEditGatilhos()" style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:var(--radius-sm);background:var(--bg-3);border:1px solid rgba(0,0,0,0.08);transition:all .2s;" onmouseover="this.style.background='var(--primary-light,rgba(245,136,58,0.12))'" onmouseout="this.style.background='var(--bg-3)'">
+                ${isAdmin ? `<button class="btn-icon" title="Editar Gatilhos" onclick="Dashboard.openEditGatilhos()" style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:var(--radius-sm);background:var(--bg-3);border:1px solid rgba(0,0,0,0.08);transition:all .2s;" onmouseover="this.style.background='var(--primary-light,rgba(245,136,58,0.12))'" onmouseout="this.style.background='var(--bg-3)'">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                </button>
+                </button>` : ""}
               </div>
               <div class="card-body">
                 ${(() => {
