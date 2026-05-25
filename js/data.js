@@ -58,7 +58,9 @@ const DataStore = {
               const fbTime = fbItem.atualizadoEm ? new Date(fbItem.atualizadoEm).getTime() : 0;
               const localTime = localItem.atualizadoEm ? new Date(localItem.atualizadoEm).getTime() : 0;
               if (localTime > fbTime) {
-                console.log(`⚡ Merge: item local mais novo para ${key}/${fbItem.id} — preservando edição local.`);
+                console.log(`⚡ Merge: item local mais novo para ${key}/${fbItem.id} — preservando edição local e curando a nuvem.`);
+                // Push para o Firebase para curar a nuvem (sincronização bidirecional)
+                db.collection(key).doc(localItem.id).set(JSON.parse(JSON.stringify(localItem))).catch(console.error);
                 return localItem; // Local ganhou: tem dados mais recentes
               }
               return fbItem; // Firebase ganhou: tem dados mais recentes ou iguais
@@ -70,6 +72,8 @@ const DataStore = {
             localList.forEach(l => {
               if (l.id && !fbIds.has(l.id) && !this._isDeleted(l.id)) {
                 mergedList.push(l);
+                // Push para curar a nuvem
+                db.collection(key).doc(l.id).set(JSON.parse(JSON.stringify(l))).catch(console.error);
               }
             });
             
@@ -163,13 +167,21 @@ const DataStore = {
 
       for (const [key, list] of Object.entries(seedData)) {
         console.log(`Semeando coleção ${key}...`);
-        const batch = db.batch();
-        list.forEach(item => {
-          const docRef = db.collection(key).doc(item.id);
-          const cleanItem = JSON.parse(JSON.stringify(item));
-          batch.set(docRef, cleanItem);
-        });
-        await batch.commit();
+        // Divide em chunks de 400 para respeitar limite do batch do Firestore
+        const chunks = [];
+        for (let i = 0; i < list.length; i += 400) {
+          chunks.push(list.slice(i, i + 400));
+        }
+        
+        for (const chunk of chunks) {
+          const batch = db.batch();
+          chunk.forEach(item => {
+            const docRef = db.collection(key).doc(item.id);
+            const cleanItem = JSON.parse(JSON.stringify(item));
+            batch.set(docRef, cleanItem);
+          });
+          await batch.commit();
+        }
         localStorage.setItem(key, JSON.stringify(list));
       }
       console.log("🌱 Semeamento do Firestore concluído com sucesso!");
@@ -196,13 +208,21 @@ const DataStore = {
     // Sincronização em Lote com o Firebase
     if (isFirebaseActive && db && key !== this.KEYS.SESSION) {
       try {
-        const batch = db.batch();
-        data.forEach(item => {
-          const docRef = db.collection(key).doc(item.id);
-          const cleanItem = JSON.parse(JSON.stringify(item));
-          batch.set(docRef, cleanItem);
+        // Divide em blocos de 400 para evitar o limite de 500 do Firestore
+        const chunks = [];
+        for (let i = 0; i < data.length; i += 400) {
+          chunks.push(data.slice(i, i + 400));
+        }
+        
+        chunks.forEach(chunk => {
+          const batch = db.batch();
+          chunk.forEach(item => {
+            const docRef = db.collection(key).doc(item.id);
+            const cleanItem = JSON.parse(JSON.stringify(item));
+            batch.set(docRef, cleanItem);
+          });
+          batch.commit().catch(e => console.error(`Erro ao salvar lote no Firebase para ${key}:`, e));
         });
-        batch.commit().catch(e => console.error(`Erro ao salvar lote no Firebase para ${key}:`, e));
       } catch (err) {
         console.error(`Falha ao preparar lote do Firebase para ${key}:`, err);
       }
