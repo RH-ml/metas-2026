@@ -11,6 +11,117 @@ const Dashboard = {
     App.refreshPage();
   },
 
+  // ─── Configuração dos Gatilhos ────────────────────────────────────────
+  getGatilhosConfig() {
+    try {
+      return JSON.parse(localStorage.getItem('dash_gatilhos_config') || '{}');
+    } catch { return {}; }
+  },
+
+  saveGatilhosConfig(cfg) {
+    localStorage.setItem('dash_gatilhos_config', JSON.stringify(cfg));
+  },
+
+  // Retorna valor acumulado de dezembro da meta (último mês com dado)
+  getValorAcumuladoDez(meta) {
+    if (!meta.mesesData || meta.mesesData.length === 0) return null;
+    // Pega o mês de dezembro (índice 11) ou o último mês com acumulado
+    const dezIdx = meta.mesesData.length - 1; // Dez é o último (índice 11)
+    const dezMes = meta.mesesData[dezIdx];
+    if (dezMes && dezMes.acumulado && dezMes.acumulado.p !== null) {
+      return { p: dezMes.acumulado.p, r: dezMes.acumulado.r };
+    }
+    return null;
+  },
+
+  // Performance baseada no acumulado de dezembro
+  getPerfAcumDez(meta) {
+    const acum = this.getValorAcumuladoDez(meta);
+    if (!acum || acum.p === null || acum.p === 0) return 0;
+    if (acum.r === null || acum.r === undefined) return 0;
+    // Usar calcPerformance do DataStore com valorAlvo=acum.p e valorAtual=acum.r
+    const metaMock = { ...meta, valorAlvo: acum.p, valorAtual: acum.r };
+    return DataStore.calcPerformance(metaMock, true) || 0;
+  },
+
+  openEditGatilhos() {
+    const corpMetas = DataStore.getMetas().filter(m => m.tipo === 'corporativa');
+    const cfg = this.getGatilhosConfig();
+    const selectedIds = cfg.selectedIds || corpMetas.filter(m => m.isGatilho).map(m => m.id);
+    const targetMin = cfg.targetMin !== undefined ? cfg.targetMin : 80;
+
+    const metasHtml = corpMetas.map(m => {
+      const isChecked = selectedIds.includes(m.id);
+      const perf = DataStore.calcPerformance(m) || 0;
+      return `
+        <label class="gatilho-check-item" style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg-3);border-radius:var(--radius-sm);border:1px solid ${isChecked ? 'var(--primary)' : 'rgba(0,0,0,0.06)'};cursor:pointer;transition:all .2s;">
+          <input type="checkbox" name="gatilhoMeta" value="${m.id}" ${isChecked ? 'checked' : ''}
+            style="width:18px;height:18px;accent-color:var(--primary);cursor:pointer;"
+            onchange="Dashboard._onGatilhoCheckChange(this)">
+          <div style="flex:1">
+            <div style="font-weight:600;font-size:.88rem;color:var(--text);">${m.titulo}</div>
+            <div style="font-size:.78rem;color:var(--text-3);margin-top:2px;">Meta: ${Components.formatNumber(m.valorAlvo)} ${m.unidade} &nbsp;·&nbsp; Atual: ${perf.toFixed(1)}%</div>
+          </div>
+        </label>`;
+    }).join('');
+
+    const content = `
+      <div style="display:flex;flex-direction:column;gap:16px;">
+        <div>
+          <label style="display:block;font-size:.8rem;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Metas Corporativas — Selecione os Gatilhos</label>
+          <div style="display:flex;flex-direction:column;gap:8px;" id="gatilhosCheckList">
+            ${metasHtml}
+          </div>
+        </div>
+        <div style="background:var(--bg-3);border-radius:var(--radius-sm);padding:14px 16px;border:1px solid rgba(0,0,0,0.06);">
+          <label style="display:block;font-size:.8rem;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Atingimento Mínimo para Acionamento do Programa (%)</label>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <input type="range" id="gatilhoTargetRange" min="0" max="120" step="1" value="${targetMin}"
+              style="flex:1;accent-color:var(--primary);"
+              oninput="document.getElementById('gatilhoTargetVal').textContent=this.value+'%'">
+            <span id="gatilhoTargetVal" style="font-size:1.2rem;font-weight:700;color:var(--primary);min-width:52px;text-align:right;">${targetMin}%</span>
+          </div>
+          <small style="color:var(--text-3);font-size:.77rem;margin-top:6px;display:block;">Se cada meta gatilho atingir pelo menos este percentual, o programa de RV é acionado.</small>
+        </div>
+      </div>`;
+
+    const footer = `
+      <button class="btn btn-ghost" onclick="Components.closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="Dashboard.saveGatilhos()">Salvar Configuração</button>`;
+
+    Components.openModal('Configurar Gatilhos do Programa', content, footer);
+  },
+
+  _onGatilhoCheckChange(el) {
+    const label = el.closest('label');
+    if (el.checked) {
+      label.style.border = '1px solid var(--primary)';
+    } else {
+      label.style.border = '1px solid rgba(0,0,0,0.06)';
+    }
+  },
+
+  saveGatilhos() {
+    const checkboxes = document.querySelectorAll('input[name="gatilhoMeta"]');
+    const selectedIds = Array.from(checkboxes).filter(c => c.checked).map(c => c.value);
+    const targetMin = parseInt(document.getElementById('gatilhoTargetRange')?.value || '80', 10);
+
+    // Atualiza isGatilho nas metas
+    const metas = DataStore.get(DataStore.KEYS.METAS);
+    metas.forEach(m => {
+      if (m.tipo === 'corporativa') {
+        m.isGatilho = selectedIds.includes(m.id);
+      }
+    });
+    DataStore.set(DataStore.KEYS.METAS, metas);
+
+    this.saveGatilhosConfig({ selectedIds, targetMin });
+    Components.closeModal();
+    Components.toast('Gatilhos atualizados com sucesso!', 'success');
+    App.refreshPage();
+  },
+
+
   render() {
     const session = Auth.getSession() || {};
     const isAdmin = session.id === 'admin' || session.nivel === 'Admin';
@@ -92,25 +203,52 @@ const Dashboard = {
             </div>
 
             <div class="card">
-              <div class="card-header"><h3 class="card-title">Gatilhos do Programa (Corporate)</h3></div>
+              <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
+                <h3 class="card-title">Gatilhos do Programa (Corporate)</h3>
+                <button class="btn-icon" title="Editar Gatilhos" onclick="Dashboard.openEditGatilhos()" style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:var(--radius-sm);background:var(--bg-3);border:1px solid rgba(0,0,0,0.08);transition:all .2s;" onmouseover="this.style.background='var(--primary-light,rgba(245,136,58,0.12))'" onmouseout="this.style.background='var(--bg-3)'">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </button>
+              </div>
               <div class="card-body">
-                <div class="gatilhos-list" style="display:flex;flex-direction:column;gap:16px;">
-                  ${gatilhos.map(g => {
-                    const perf = DataStore.calcPerformance(g) || 0;
-                    return `
-                      <div class="gatilho-item" style="padding:12px;background:var(--bg-3);border-radius:var(--radius-sm);border:1px solid rgba(0,0,0,0.05);">
-                        <div class="gatilho-info" style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:0.85rem;">
-                          <strong style="color:var(--text);">${g.titulo}</strong>
-                          <span style="color:var(--text-3);">${Components.formatNumber(g.valorAtual)} / ${Components.formatNumber(g.valorAlvo)} ${g.unidade}</span>
-                        </div>
-                        <div class="gatilho-chart">
-                          ${Components.progressBar(perf, 'auto', 8, true)}
-                        </div>
+                ${(() => {
+                  const cfg = Dashboard.getGatilhosConfig();
+                  const targetMin = cfg.targetMin !== undefined ? cfg.targetMin : 80;
+                  const gatilhosAtivos = gatilhos.filter(g => g.isGatilho !== false);
+                  const programaAcionado = gatilhosAtivos.length > 0 && gatilhosAtivos.every(g => (Dashboard.getPerfAcumDez(g) || DataStore.calcPerformance(g) || 0) >= targetMin);
+                  return `
+                    ${gatilhosAtivos.length > 0 ? `
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding:10px 14px;border-radius:var(--radius-sm);background:${programaAcionado ? 'rgba(46,134,77,0.1)' : 'rgba(255,81,68,0.08)'};border:1px solid ${programaAcionado ? 'rgba(46,134,77,0.3)' : 'rgba(255,81,68,0.25)'};">
+                      <div style="display:flex;align-items:center;gap:8px;">
+                        <span style="width:9px;height:9px;border-radius:50%;background:${programaAcionado ? '#2E864D' : '#FF5144'};display:inline-block;"></span>
+                        <span style="font-size:.82rem;font-weight:600;color:${programaAcionado ? '#2E864D' : '#FF5144'};">Programa ${programaAcionado ? 'ACIONADO' : 'NÃO ACIONADO'}</span>
                       </div>
-                    `;
-                  }).join('')}
-                  ${gatilhos.length === 0 ? '<p class="text-muted">Nenhum gatilho corporativo configurado.</p>' : ''}
-                </div>
+                      <span style="font-size:.78rem;color:var(--text-3);">Mínimo: <strong>${targetMin}%</strong> por gatilho</span>
+                    </div>` : ''}
+                    <div class="gatilhos-list" style="display:flex;flex-direction:column;gap:16px;">
+                      ${gatilhosAtivos.map(g => {
+                        const cfg2 = Dashboard.getGatilhosConfig();
+                        const tMin = cfg2.targetMin !== undefined ? cfg2.targetMin : 80;
+                        // Valor acumulado de dezembro
+                        const acumDez = Dashboard.getValorAcumuladoDez(g);
+                        const pDez = acumDez ? acumDez.p : (g.valorAlvo || 0);
+                        const rDez = acumDez ? acumDez.r : g.valorAtual;
+                        const perf = Dashboard.getPerfAcumDez(g) || DataStore.calcPerformance(g) || 0;
+                        const atingido = perf >= tMin;
+                        return `
+                          <div class="gatilho-item" style="padding:12px;background:var(--bg-3);border-radius:var(--radius-sm);border:1px solid ${atingido ? 'rgba(46,134,77,0.25)' : 'rgba(0,0,0,0.05)'};">
+                            <div class="gatilho-info" style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:0.85rem;">
+                              <strong style="color:var(--text);">${g.titulo}</strong>
+                              <span style="color:var(--text-3);">${rDez !== null && rDez !== undefined ? Components.formatNumber(rDez) : '0'} / ${Components.formatNumber(pDez)} ${g.unidade}</span>
+                            </div>
+                            <div class="gatilho-chart">
+                              ${Components.progressBarWithMin(perf, tMin, 'auto', 8, true)}
+                            </div>
+                          </div>
+                        `;
+                      }).join('')}
+                      ${gatilhosAtivos.length === 0 ? '<p class="text-muted">Nenhum gatilho corporativo configurado. Clique no lápis para configurar.</p>' : ''}
+                    </div>`;
+                })()}
               </div>
             </div>
           </div>
