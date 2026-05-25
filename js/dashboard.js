@@ -231,11 +231,12 @@ const Dashboard = {
 
     // Area section
     let areaMetas = [];
-    if (this.currentArea && this.currentArea !== 'todas' && this.currentArea !== 'all') {
+    if (this.currentArea === 'todas' || this.currentArea === 'all') {
+      areaMetas = metas;
+    } else if (this.currentArea) {
       areaMetas = metas.filter(m => m.areaId === this.currentArea);
     } else {
-      // If no specific area selected, show all metas
-      areaMetas = metas;
+      areaMetas = [];
     }
 
     const areaPesoTotal = areaMetas.reduce((s, m) => s + (parseFloat(m.peso) || 0), 0);

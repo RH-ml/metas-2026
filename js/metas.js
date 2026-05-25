@@ -76,7 +76,7 @@ const Metas = {
                 </tr>
               </thead>
               <tbody>
-                ${metas.length === 0 ? `<tr><td colspan="7">${Components.emptyState('Nenhuma meta encontrada para esta área/filtro.')}</td></tr>` : metas.map(m => this.renderMetaRow(m)).join('')}
+                ${metas.length === 0 ? `<tr><td colspan="7">${Components.emptyState(!this.currentArea ? 'Por favor, selecione uma área no filtro acima para visualizar as metas.' : 'Nenhuma meta encontrada para esta área/filtro.')}</td></tr>` : metas.map(m => this.renderMetaRow(m)).join('')}
               </tbody>
             </table>
           </div>
@@ -147,16 +147,8 @@ const Metas = {
     const isAdmin = session.id === 'admin' || session.nivel === 'Admin';
     const isDiretoria = session.nivel === 'Diretoria';
     
-    // Se não há área selecionada, define como a área do próprio usuário por padrão
-    if (!this.currentArea) {
-       const userArea = DataStore.getAreaAtual(session.id);
-       if (userArea) {
-          this.currentArea = userArea.id;
-          localStorage.setItem('metas_filter_area', this.currentArea);
-       } else if (isAdmin) {
-          this.currentArea = 'todas';
-       }
-    }
+    // Se não há área selecionada, não define nada (força seleção do usuário).
+    // Removido o fallback para área do usuário e admin (que marcava 'todas').
 
     // Security check: if currentArea is set but user is not authorized to see it, clear it
     if (this.currentArea === 'todas' || this.currentArea === 'all') {
@@ -206,8 +198,10 @@ const Metas = {
         // Meta sem responsável: usa areaId salvo
         return m.areaId === this.currentArea;
       });
-    } else {
+    } else if (this.currentArea === 'todas' || this.currentArea === 'all') {
       areaMetas = metas;
+    } else {
+      areaMetas = [];
     }
     
     // Apply additional filters (search, status)

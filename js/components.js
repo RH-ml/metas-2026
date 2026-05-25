@@ -290,7 +290,7 @@ const Components = {
   treeSelector(selectedId, onSelectName) {
     const authorizedTree = DataStore.getAuthorizedAreaTree();
     const currentArea = DataStore.getAreaById(selectedId);
-    const label = currentArea ? `${currentArea.codigo} - ${currentArea.nome}` : (selectedId === 'todas' || selectedId === 'all' ? 'Todas as Áreas' : 'Selecione uma área');
+    const label = currentArea ? `${currentArea.codigo} - ${currentArea.nome}` : (selectedId === 'todas' || selectedId === 'all' ? 'Todas as Áreas' : 'Selecione uma área...');
 
     return `
       <div class="tree-dropdown-wrap" id="tree-selector-wrap">
