@@ -1,4 +1,4 @@
-﻿// ============================================
+// ============================================
 // DASHBOARD.JS — Página principal do dashboard
 // ============================================
 
@@ -315,7 +315,12 @@ const Dashboard = {
                         `;
                       }).join('')}
                       ${gatilhosAtivos.length === 0 ? '<p class="text-muted">Nenhum gatilho configurado. Clique no lápis para configurar.</p>' : ''}
-                    </div>`;
+                    </div>
+                    ${gatilhosAtivos.length > 0 ? `
+                    <div style="display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid rgba(0,0,0,0.06);">
+                      <span style="width:8px;height:2px;background:#FF5144;border-radius:2px;display:inline-block;"></span>
+                      <span style="font-size:0.78rem;color:#FF5144;font-weight:600;">mínimo ${targetMin}% para acionamento do programa</span>
+                    </div>` : ''}`;
                 })()}
               </div>
             </div>

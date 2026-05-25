@@ -97,6 +97,7 @@ const Components = {
   },
 
   // Progress Bar with minimum marker (red line at targetMin %)
+  // O label de mínimo NÃO é renderizado aqui — fica fora, abaixo de todos os gatilhos.
   progressBarWithMin(percent, targetMin = 80, color = '#F5883A', height = 8, showLabel = true) {
     const p = Math.min(150, Math.max(0, percent));
     const displayP = Math.min(100, p);
@@ -110,15 +111,14 @@ const Components = {
     // Position of the minimum marker (clamped to 0-100%)
     const markerPos = Math.min(100, Math.max(0, targetMin));
     return `
-      <div class="progress-wrap">
-        <div class="progress-bar" style="height:${height}px;position:relative;">
-          <div class="progress-fill" style="width:${displayP}%;background:${barColor}" data-width="${displayP}"></div>
-          <div style="position:absolute;top:-3px;left:${markerPos}%;transform:translateX(-50%);width:2px;height:${height + 6}px;background:#FF5144;border-radius:2px;z-index:2;" title="Mínimo: ${targetMin}%"></div>
+      <div class="progress-wrap" style="display:flex;align-items:center;gap:10px;">
+        <div style="flex:1;position:relative;">
+          <div class="progress-bar" style="height:${height}px;position:relative;">
+            <div class="progress-fill" style="width:${displayP}%;background:${barColor}" data-width="${displayP}"></div>
+            <div style="position:absolute;top:-3px;left:${markerPos}%;transform:translateX(-50%);width:2px;height:${height + 6}px;background:#FF5144;border-radius:2px;z-index:2;" title="Mínimo: ${targetMin}%"></div>
+          </div>
         </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
-          ${showLabel ? `<span class="progress-label" style="color:${barColor}">${this.formatNumber(p)}%</span>` : '<span></span>'}
-          <span style="font-size:0.72rem;color:#FF5144;font-weight:600;">mín. ${targetMin}%</span>
-        </div>
+        ${showLabel ? `<span class="progress-label" style="color:${barColor};font-size:0.8rem;font-weight:700;min-width:40px;text-align:right;white-space:nowrap;">${this.formatNumber(p)}%</span>` : ''}
       </div>`;
   },
 
