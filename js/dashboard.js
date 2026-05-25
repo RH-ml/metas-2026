@@ -1,4 +1,4 @@
-﻿// ============================================
+// ============================================
 // DASHBOARD.JS — Página principal do dashboard
 // ============================================
 
@@ -219,7 +219,7 @@ const Dashboard = {
     
     // Corporate section
     const corpMetas = metas.filter(m => m.tipo === 'corporativa');
-    const gatilhos = corpMetas.filter(m => m.isGatilho);
+    const gatilhos = metas.filter(m => m.isGatilho === true);
     const corpPesoTotal = corpMetas.reduce((s, m) => s + (parseFloat(m.peso) || 0), 0);
     const corpPerf = corpPesoTotal > 0 ? corpMetas.reduce((s, m) => s + ((DataStore.calcPerformance(m) || 0) * (parseFloat(m.peso) || 0)), 0) / corpPesoTotal : 0;
 
