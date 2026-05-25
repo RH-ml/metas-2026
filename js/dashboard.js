@@ -1,4 +1,4 @@
-// ============================================
+﻿// ============================================
 // DASHBOARD.JS — Página principal do dashboard
 // ============================================
 
@@ -44,11 +44,59 @@ const Dashboard = {
     return DataStore.calcPerformance(metaMock, true) || 0;
   },
 
-  openEditGatilhos() {
-    const corpMetas = DataStore.getMetas().filter(m => m.tipo === 'corporativa');
+  // Retorna a área corporativa (primeiro nível raiz, ou código '1.0', ou a que tem mais metas corporativas)
+  getAreaCorporativa() {
+    const areas = DataStore.getAreas();
+    // Prioridade: área salva em config > código '1.0' > primeiro nó raiz sem parentId
     const cfg = this.getGatilhosConfig();
+    if (cfg.areaCorpId) {
+      const saved = areas.find(a => a.id === cfg.areaCorpId);
+      if (saved) return saved;
+    }
+    const byCode = areas.find(a => a.codigo === '1.0');
+    if (byCode) return byCode;
+    return areas.find(a => !a.parentId) || null;
+  },
+
+  openEditGatilhos() {
+    // Busca metas da área corporativa selecionada (ou todas as áreas raiz se não configurada)
+    const todasMetas = DataStore.getMetas().filter(m => m.tipo !== 'compartilhada');
+    const areas = DataStore.getAreas();
+    const cfg = this.getGatilhosConfig();
+    const areaCorp = this.getAreaCorporativa();
+
+    // Coleta IDs da área corporativa e todas as sub-áreas dela
+    const getAreaIds = (rootId) => {
+      const ids = [rootId];
+      const queue = [rootId];
+      while (queue.length > 0) {
+        const cur = queue.shift();
+        areas.filter(a => a.parentId === cur).forEach(child => {
+          ids.push(child.id);
+          queue.push(child.id);
+        });
+      }
+      return ids;
+    };
+
+    const corpAreaIds = areaCorp ? getAreaIds(areaCorp.id) : [];
+
+    // Metas da área corporativa: pela areaId da meta OU pelo areaId do responsável
+    const corpMetas = todasMetas.filter(m => {
+      if (corpAreaIds.length === 0) return m.tipo === 'corporativa';
+      if (corpAreaIds.includes(m.areaId)) return true;
+      if (m.responsavelId) {
+        const respArea = DataStore.getAreaAtual(m.responsavelId);
+        if (respArea && corpAreaIds.includes(respArea.id)) return true;
+      }
+      return false;
+    });
+
     const selectedIds = cfg.selectedIds || corpMetas.filter(m => m.isGatilho).map(m => m.id);
     const targetMin = cfg.targetMin !== undefined ? cfg.targetMin : 80;
+
+    // Lista de áreas raiz para o usuário poder trocar a área corporativa de referência
+    const rootAreas = areas.filter(a => !a.parentId);
 
     const metasHtml = corpMetas.map(m => {
       const isChecked = selectedIds.includes(m.id);
@@ -65,12 +113,23 @@ const Dashboard = {
         </label>`;
     }).join('');
 
+    const emptyMsg = corpMetas.length === 0
+      ? `<p style="color:var(--text-3);font-size:.85rem;padding:12px 0;">Nenhuma meta encontrada para a área <strong>${areaCorp ? areaCorp.codigo + ' – ' + areaCorp.nome : 'Corporativo'}</strong>.</p>`
+      : '';
+
     const content = `
       <div style="display:flex;flex-direction:column;gap:16px;">
+        <div style="background:var(--bg-3);border-radius:var(--radius-sm);padding:12px 16px;border:1px solid rgba(0,0,0,0.06);">
+          <label style="display:block;font-size:.8rem;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Área de Referência (Corporativo)</label>
+          <select id="gatilhoAreaCorp" class="form-input" style="width:100%;" onchange="Dashboard._onAreaCorpChange(this.value)">
+            ${rootAreas.map(a => `<option value="${a.id}" ${areaCorp && areaCorp.id === a.id ? 'selected' : ''}>${a.codigo} – ${a.nome}</option>`).join('')}
+          </select>
+          <small style="color:var(--text-3);font-size:.77rem;margin-top:6px;display:block;">Metas pertencentes a esta área estarão disponíveis como gatilhos.</small>
+        </div>
         <div>
-          <label style="display:block;font-size:.8rem;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Metas Corporativas — Selecione os Gatilhos</label>
+          <label style="display:block;font-size:.8rem;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Metas — Selecione os Gatilhos</label>
           <div style="display:flex;flex-direction:column;gap:8px;" id="gatilhosCheckList">
-            ${metasHtml}
+            ${metasHtml}${emptyMsg}
           </div>
         </div>
         <div style="background:var(--bg-3);border-radius:var(--radius-sm);padding:14px 16px;border:1px solid rgba(0,0,0,0.06);">
@@ -92,6 +151,15 @@ const Dashboard = {
     Components.openModal('Configurar Gatilhos do Programa', content, footer);
   },
 
+  _onAreaCorpChange(areaId) {
+    // Salva a nova área corporativa e reabre o modal atualizado
+    const cfg = this.getGatilhosConfig();
+    cfg.areaCorpId = areaId;
+    this.saveGatilhosConfig(cfg);
+    Components.closeModal();
+    setTimeout(() => this.openEditGatilhos(), 50);
+  },
+
   _onGatilhoCheckChange(el) {
     const label = el.closest('label');
     if (el.checked) {
@@ -105,17 +173,22 @@ const Dashboard = {
     const checkboxes = document.querySelectorAll('input[name="gatilhoMeta"]');
     const selectedIds = Array.from(checkboxes).filter(c => c.checked).map(c => c.value);
     const targetMin = parseInt(document.getElementById('gatilhoTargetRange')?.value || '80', 10);
+    const areaCorpId = document.getElementById('gatilhoAreaCorp')?.value || null;
 
-    // Atualiza isGatilho nas metas
+    // Atualiza isGatilho nas metas (reseta todas, marca apenas as selecionadas)
     const metas = DataStore.get(DataStore.KEYS.METAS);
     metas.forEach(m => {
-      if (m.tipo === 'corporativa') {
-        m.isGatilho = selectedIds.includes(m.id);
+      if (selectedIds.includes(m.id)) {
+        m.isGatilho = true;
+      } else {
+        // Remove isGatilho apenas de metas que não estão mais selecionadas
+        m.isGatilho = false;
       }
     });
     DataStore.set(DataStore.KEYS.METAS, metas);
 
-    this.saveGatilhosConfig({ selectedIds, targetMin });
+    const cfg = this.getGatilhosConfig();
+    this.saveGatilhosConfig({ ...cfg, selectedIds, targetMin, areaCorpId: areaCorpId || cfg.areaCorpId });
     Components.closeModal();
     Components.toast('Gatilhos atualizados com sucesso!', 'success');
     App.refreshPage();
@@ -204,7 +277,7 @@ const Dashboard = {
 
             <div class="card">
               <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
-                <h3 class="card-title">Gatilhos do Programa (Corporate)</h3>
+                <h3 class="card-title">Gatilhos do Programa</h3>
                 <button class="btn-icon" title="Editar Gatilhos" onclick="Dashboard.openEditGatilhos()" style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:var(--radius-sm);background:var(--bg-3);border:1px solid rgba(0,0,0,0.08);transition:all .2s;" onmouseover="this.style.background='var(--primary-light,rgba(245,136,58,0.12))'" onmouseout="this.style.background='var(--bg-3)'">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                 </button>
@@ -214,21 +287,10 @@ const Dashboard = {
                   const cfg = Dashboard.getGatilhosConfig();
                   const targetMin = cfg.targetMin !== undefined ? cfg.targetMin : 80;
                   const gatilhosAtivos = gatilhos.filter(g => g.isGatilho !== false);
-                  const programaAcionado = gatilhosAtivos.length > 0 && gatilhosAtivos.every(g => (Dashboard.getPerfAcumDez(g) || DataStore.calcPerformance(g) || 0) >= targetMin);
                   return `
-                    ${gatilhosAtivos.length > 0 ? `
-                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding:10px 14px;border-radius:var(--radius-sm);background:${programaAcionado ? 'rgba(46,134,77,0.1)' : 'rgba(255,81,68,0.08)'};border:1px solid ${programaAcionado ? 'rgba(46,134,77,0.3)' : 'rgba(255,81,68,0.25)'};">
-                      <div style="display:flex;align-items:center;gap:8px;">
-                        <span style="width:9px;height:9px;border-radius:50%;background:${programaAcionado ? '#2E864D' : '#FF5144'};display:inline-block;"></span>
-                        <span style="font-size:.82rem;font-weight:600;color:${programaAcionado ? '#2E864D' : '#FF5144'};">Programa ${programaAcionado ? 'ACIONADO' : 'NÃO ACIONADO'}</span>
-                      </div>
-                      <span style="font-size:.78rem;color:var(--text-3);">Mínimo: <strong>${targetMin}%</strong> por gatilho</span>
-                    </div>` : ''}
                     <div class="gatilhos-list" style="display:flex;flex-direction:column;gap:16px;">
                       ${gatilhosAtivos.map(g => {
-                        const cfg2 = Dashboard.getGatilhosConfig();
-                        const tMin = cfg2.targetMin !== undefined ? cfg2.targetMin : 80;
-                        // Valor acumulado de dezembro
+                        const tMin = targetMin;
                         const acumDez = Dashboard.getValorAcumuladoDez(g);
                         const pDez = acumDez ? acumDez.p : (g.valorAlvo || 0);
                         const rDez = acumDez ? acumDez.r : g.valorAtual;
@@ -246,7 +308,7 @@ const Dashboard = {
                           </div>
                         `;
                       }).join('')}
-                      ${gatilhosAtivos.length === 0 ? '<p class="text-muted">Nenhum gatilho corporativo configurado. Clique no lápis para configurar.</p>' : ''}
+                      ${gatilhosAtivos.length === 0 ? '<p class="text-muted">Nenhum gatilho configurado. Clique no lápis para configurar.</p>' : ''}
                     </div>`;
                 })()}
               </div>
