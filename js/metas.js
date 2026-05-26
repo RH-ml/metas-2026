@@ -169,7 +169,29 @@ const Metas = {
     // Se houver área selecionada, filtra por EXATO, mas inclui metas compartilhadas
     // onde o corresponsável pertença a esta área.
     let areaMetas = [];
-    if (this.currentArea && this.currentArea !== 'todas' && this.currentArea !== 'all') {
+    const isSearching = this.currentSearch && this.currentSearch.trim() !== '';
+
+    if (isSearching) {
+      if (isAdmin || isDiretoria) {
+        areaMetas = metas;
+      } else {
+        const authorizedIds = DataStore.getAuthorizedAreas().map(a => a.id);
+        areaMetas = metas.filter(m => {
+          if (m.tipo === 'compartilhada' && Array.isArray(m.coresponsavelIds)) {
+            return m.coresponsavelIds.some(uid => {
+              const uArea = DataStore.getAreaAtual(uid);
+              return uArea && authorizedIds.includes(uArea.id);
+            });
+          }
+          if (m.responsavelId) {
+            const respArea = DataStore.getAreaAtual(m.responsavelId);
+            if (respArea) return authorizedIds.includes(respArea.id);
+            return authorizedIds.includes(m.areaId);
+          }
+          return authorizedIds.includes(m.areaId);
+        });
+      }
+    } else if (this.currentArea && this.currentArea !== 'todas' && this.currentArea !== 'all') {
       areaMetas = metas.filter(m => {
         // Se for meta compartilhada, ela SÓ aparece na área EXATA do correspónsavel.
         // NÃO aparece na área do responsável original (onde já existe a meta-mãe),
@@ -211,8 +233,11 @@ const Metas = {
         return false;
       }
       const s = this.currentSearch.toLowerCase();
+      const responsavel = m.responsavelId ? DataStore.getUserById(m.responsavelId) : null;
+      const respNome = responsavel ? responsavel.nome.toLowerCase() : '';
       const matchSearch = (m.titulo || '').toLowerCase().includes(s) || 
-                          (m.codigo || '').toLowerCase().includes(s);
+                          (m.codigo || '').toLowerCase().includes(s) ||
+                          respNome.includes(s);
       return matchSearch;
     });
     metas = filtered;
