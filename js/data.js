@@ -194,7 +194,11 @@ const DataStore = {
     const value = localStorage.getItem(key);
     if (!value) return [];
     try {
-      return JSON.parse(value);
+      const parsed = JSON.parse(value);
+      if (key !== this.KEYS.SESSION && !Array.isArray(parsed)) {
+        return [];
+      }
+      return parsed;
     } catch (error) {
       console.warn(`DataStore: invalid JSON for ${key} — resetting value`, error);
       localStorage.removeItem(key);
