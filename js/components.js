@@ -67,7 +67,7 @@ const Components = {
           ${showSearch ? `
           <div class="header-search">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" placeholder="Buscar..." class="search-input" id="globalSearch">
+            <input type="text" placeholder="Buscar... (Enter)" class="search-input" id="globalSearch" value="${(window.Metas && window.Metas.currentSearch) ? window.Metas.currentSearch : ''}" onchange="if(window.Metas) { window.Metas.currentSearch = this.value; App.refreshPage(); }" onkeyup="if(event.key === 'Enter') { this.blur(); }">
           </div>` : ''}
           <div class="header-profile">
             <div class="avatar">${avatar}</div>
