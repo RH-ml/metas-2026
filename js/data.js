@@ -205,8 +205,8 @@ const DataStore = {
   set(key, data) {
     localStorage.setItem(key, JSON.stringify(data));
     
-    // Sincronização em Lote com o Firebase
-    if (isFirebaseActive && db && key !== this.KEYS.SESSION) {
+    // Sincronização em Lote com o Firebase — apenas para arrays de objetos com .id
+    if (isFirebaseActive && db && key !== this.KEYS.SESSION && Array.isArray(data) && data.length > 0 && data[0] && data[0].id) {
       try {
         // Divide em blocos de 400 para evitar o limite de 500 do Firestore
         const chunks = [];
