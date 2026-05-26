@@ -42,7 +42,7 @@ const LembretesEngine = {
   },
 
   // ── Executa uma regra específica (avalia condição e dispara) ──
-  async executeRegra(regra, forceDispatch = false) {
+  async executeRegra(regra, forceDispatch = false, interactive = false) {
     const destinatarios = DataStore.buildRecipientList(regra);
     const metasAfetadas = this.evaluateEvento(regra);
 
@@ -60,69 +60,104 @@ const LembretesEngine = {
 
     // Dispara para cada destinatário × cada canal
     for (const user of destinatarios) {
-      const metasDoUser = metasAfetadas.filter(m => m.responsavelId === user.id);
-      const metasParaMsg = metasDoUser.length > 0 ? metasDoUser : metasAfetadas.slice(0, 3);
+      const userMetas = metasAfetadas.filter(m => m.responsavelId === user.id);
+      const metasParaMsg = userMetas.length > 0 ? userMetas : (forceDispatch ? metasAfetadas.slice(0, 3) : []);
+      if (metasParaMsg.length === 0) continue;
 
       for (const canal of canais) {
-        for (const meta of (forceDispatch ? metasAfetadas.slice(0, 1) : metasParaMsg)) {
-          try {
-            const vars = {
-              nome_usuario: user.nome,
-              nome_meta: meta.titulo || '—',
-              codigo_meta: meta.codigo || '—',
-              competencia,
-              prazo: meta.mesFim ? `Mês ${meta.mesFim}` : '—',
-              gestor: this._getNomeGestor(user),
-              area: this._getNomeArea(user),
-              link_sistema: linkSistema
-            };
+        try {
+          // Formata as variáveis consolidadas
+          let nomeMeta = '';
+          let codigoMeta = '';
+          let prazo = '';
+          let area = '';
+          let listaMetas = '';
 
-            const assunto = DataStore.resolveTemplate(
-              template?.assunto || `⚠️ Lembrete: ${regra.nome}`,
-              vars
-            );
-            const corpo = DataStore.resolveTemplate(
-              template?.corpo || `Olá {{nome_usuario}},\n\nVocê possui uma pendência relacionada à meta {{nome_meta}}.\n\nAcesse: {{link_sistema}}`,
-              vars
-            );
+          const listaMetasText = metasParaMsg.map(m => {
+            const cod = m.codigo ? `[${m.codigo}] ` : '';
+            const prazoStr = m.mesFim ? ` (Prazo: Mês ${m.mesFim})` : '';
+            return `• ${cod}${m.titulo}${prazoStr}`;
+          }).join('\n');
 
-            await GraphClient.dispatch({
-              canal,
-              destinatario: { email: user.email, nome: user.nome },
-              subject: assunto,
-              message: corpo,
-              isHtml: false
-            });
-
-            DataStore.addLembreteLog({
-              regraId: regra.id,
-              regraNome: regra.nome,
-              dataHora: new Date().toISOString(),
-              canal,
-              destinatarioId: user.id,
-              destinatarioNome: user.nome,
-              destinatarioEmail: user.email,
-              metaId: meta.id,
-              metaTitulo: meta.titulo,
-              status: 'enviado',
-              erro: null
-            });
-
-          } catch (err) {
-            DataStore.addLembreteLog({
-              regraId: regra.id,
-              regraNome: regra.nome,
-              dataHora: new Date().toISOString(),
-              canal,
-              destinatarioId: user.id,
-              destinatarioNome: user.nome,
-              destinatarioEmail: user.email,
-              metaId: meta.id,
-              metaTitulo: meta.titulo || '—',
-              status: 'erro',
-              erro: err.message
-            });
+          if (metasParaMsg.length === 1) {
+            const m = metasParaMsg[0];
+            nomeMeta = m.titulo;
+            codigoMeta = m.codigo || '—';
+            prazo = m.mesFim ? `Mês ${m.mesFim}` : '—';
+            const a = DataStore.getAreaById(m.areaId);
+            area = a ? `${a.codigo} - ${a.nome}` : '—';
+            listaMetas = `• ${m.codigo ? `[${m.codigo}] ` : ''}${m.titulo}`;
+          } else {
+            nomeMeta = '\n' + listaMetasText;
+            codigoMeta = metasParaMsg.map(m => m.codigo).filter(Boolean).join(', ') || '—';
+            prazo = metasParaMsg.map(m => m.mesFim ? `Mês ${m.mesFim}` : '').filter(Boolean).filter((v,i,a) => a.indexOf(v)===i).join(', ') || '—';
+            area = metasParaMsg.map(m => {
+              const a = DataStore.getAreaById(m.areaId);
+              return a ? `${a.codigo} - ${a.nome}` : '';
+            }).filter(Boolean).filter((v,i,a) => a.indexOf(v)===i).join(', ') || '—';
+            listaMetas = listaMetasText;
           }
+
+          const vars = {
+            nome_usuario: user.nome,
+            nome_meta: nomeMeta,
+            codigo_meta: codigoMeta,
+            competencia,
+            prazo,
+            gestor: this._getNomeGestor(user),
+            area,
+            link_sistema: linkSistema,
+            lista_metas: listaMetas
+          };
+
+          const assunto = DataStore.resolveTemplate(
+            template?.assunto || `⚠️ Lembrete: ${regra.nome}`,
+            vars
+          );
+          const corpo = DataStore.resolveTemplate(
+            template?.corpo || `Olá {{nome_usuario}},\n\nVocê possui as seguintes pendências de metas:\n\n{{lista_metas}}\n\nAcesse: {{link_sistema}}`,
+            vars
+          );
+
+          await GraphClient.dispatch({
+            canal,
+            destinatario: { email: user.email, nome: user.nome },
+            subject: assunto,
+            message: corpo,
+            isHtml: false,
+            interactive
+          });
+
+          // Adiciona log consolidado
+          DataStore.addLembreteLog({
+            regraId: regra.id,
+            regraNome: regra.nome,
+            dataHora: new Date().toISOString(),
+            canal,
+            destinatarioId: user.id,
+            destinatarioNome: user.nome,
+            destinatarioEmail: user.email,
+            metaId: metasParaMsg.map(m => m.id).join(', '),
+            metaTitulo: metasParaMsg.map(m => m.titulo).join(', '),
+            status: 'enviado',
+            erro: null
+          });
+
+        } catch (err) {
+          DataStore.addLembreteLog({
+            regraId: regra.id,
+            regraNome: regra.nome,
+            dataHora: new Date().toISOString(),
+            canal,
+            destinatarioId: user.id,
+            destinatarioNome: user.nome,
+            destinatarioEmail: user.email,
+            metaId: metasParaMsg.map(m => m.id).join(', '),
+            metaTitulo: metasParaMsg.map(m => m.titulo).join(', ') || '—',
+            status: 'erro',
+            erro: err.message
+          });
+          if (interactive) throw err;
         }
       }
     }

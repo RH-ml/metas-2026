@@ -38,13 +38,14 @@ const Lembretes = {
 
   VARIAVEIS: [
     { key: 'nome_usuario',  desc: 'Nome do destinatário' },
-    { key: 'nome_meta',     desc: 'Título da meta' },
+    { key: 'nome_meta',     desc: 'Título da meta (ou lista compacta)' },
     { key: 'codigo_meta',   desc: 'Código da meta' },
     { key: 'competencia',   desc: 'Mês/Ano de competência' },
     { key: 'prazo',         desc: 'Prazo da meta' },
     { key: 'gestor',        desc: 'Nome do gestor' },
     { key: 'area',          desc: 'Área do responsável' },
-    { key: 'link_sistema',  desc: 'Link de acesso ao sistema' }
+    { key: 'link_sistema',  desc: 'Link de acesso ao sistema' },
+    { key: 'lista_metas',   desc: 'Lista formatada de metas pendentes' }
   ],
 
   // ─── Render principal ─────────────────────────────────────────────────
@@ -232,7 +233,7 @@ const Lembretes = {
     if (!regra) return;
     Components.toast(`⏳ Disparando "${regra.nome}"...`, 'info', 3000);
     try {
-      await LembretesEngine.executeRegra(regra, true);
+      await LembretesEngine.executeRegra(regra, true, true);
       Components.toast(`✅ Lembrete "${regra.nome}" disparado com sucesso!`, 'success');
       App.refreshPage();
     } catch (e) {
@@ -452,10 +453,9 @@ const Lembretes = {
             <label class="form-label">Corpo da Mensagem *</label>
             <textarea class="form-input" name="corpo" rows="8" required placeholder="Olá {{nome_usuario}},
 
-Você possui metas pendentes referentes a {{competencia}}.
+Você possui as seguintes metas pendentes referentes a {{competencia}}:
 
-Meta: {{nome_meta}}
-Área: {{area}}
+{{lista_metas}}
 
 Acesse o sistema: {{link_sistema}}">${tpl?.corpo || ''}</textarea>
             <small style="color:var(--text-3);display:block;margin-top:4px;">Use {{variavel}} para inserir dados dinâmicos. Veja a lista de variáveis disponíveis na tela de Templates.</small>
@@ -489,7 +489,8 @@ Acesse o sistema: {{link_sistema}}">${tpl?.corpo || ''}</textarea>
       prazo: 'Mês 12',
       gestor: 'Maria Fernanda',
       area: '1.4.1 - Gerência de Novos Negócios',
-      link_sistema: window.location.origin + window.location.pathname
+      link_sistema: window.location.origin + window.location.pathname,
+      lista_metas: '• [MET0067] Garantir Contratação VGV (Prazo: Mês 12)\n• [MET0068] Desenvolvimento de Líderes (Prazo: Mês 12)'
     };
     return DataStore.resolveTemplate(corpo, vars);
   },

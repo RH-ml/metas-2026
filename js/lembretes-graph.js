@@ -8,14 +8,26 @@ const GraphClient = {
   _tokenCache: null,
 
   // ── Obtém token de acesso com escopos de envio (incremental consent) ──
-  async getAccessToken() {
+  // ── Obtém token de acesso com escopos de envio (incremental consent) ──
+  async getAccessToken(interactive = false) {
     if (!window.msalInstance) {
       throw new Error('MSAL não inicializado. Faça login com Microsoft primeiro.');
     }
 
-    const accounts = msalInstance.getAllAccounts();
+    let accounts = msalInstance.getAllAccounts();
     if (!accounts || accounts.length === 0) {
-      throw new Error('Nenhuma conta Microsoft ativa. Faça login com Microsoft para usar este recurso.');
+      if (interactive) {
+        try {
+          const loginResponse = await msalInstance.loginPopup({
+            scopes: ['Mail.Send', 'Chat.ReadWrite', 'User.Read']
+          });
+          accounts = [loginResponse.account];
+        } catch (loginError) {
+          throw new Error('Não foi possível vincular sua conta Microsoft: ' + loginError.message);
+        }
+      } else {
+        throw new Error('Nenhuma conta Microsoft ativa. Faça login com Microsoft para usar este recurso.');
+      }
     }
 
     const request = {
@@ -29,20 +41,24 @@ const GraphClient = {
       this._tokenCache = response.accessToken;
       return response.accessToken;
     } catch (silentError) {
-      // Se falhar silenciosamente, solicita interativo (popup)
-      try {
-        const response = await msalInstance.acquireTokenPopup(request);
-        this._tokenCache = response.accessToken;
-        return response.accessToken;
-      } catch (popupError) {
-        throw new Error('Não foi possível obter permissão de envio: ' + popupError.message);
+      // Se falhar silenciosamente e for interativo, solicita interativo (popup)
+      if (interactive) {
+        try {
+          const response = await msalInstance.acquireTokenPopup(request);
+          this._tokenCache = response.accessToken;
+          return response.accessToken;
+        } catch (popupError) {
+          throw new Error('Não foi possível obter permissão de envio: ' + popupError.message);
+        }
+      } else {
+        throw new Error('Sessão expirada. É necessário realizar login de forma interativa.');
       }
     }
   },
 
   // ── Requisição autenticada à Graph API ──
-  async _fetch(method, endpoint, body = null) {
-    const token = await this.getAccessToken();
+  async _fetch(method, endpoint, body = null, interactive = false) {
+    const token = await this.getAccessToken(interactive);
     const opts = {
       method,
       headers: {
@@ -62,7 +78,7 @@ const GraphClient = {
 
   // ── Envia e-mail via Outlook / Microsoft 365 ──
   // to: { email, nome }  |  subject: string  |  body: string (HTML ou texto)
-  async sendEmail({ to, subject, body, isHtml = false }) {
+  async sendEmail({ to, subject, body, isHtml = false, interactive = false }) {
     const payload = {
       message: {
         subject,
@@ -81,19 +97,19 @@ const GraphClient = {
       },
       saveToSentItems: false
     };
-    await this._fetch('POST', '/me/sendMail', payload);
+    await this._fetch('POST', '/me/sendMail', payload, interactive);
     return { success: true, canal: 'email', destinatario: to.email };
   },
 
   // ── Envia mensagem direta (DM) via Microsoft Teams ──
-  async sendTeamsDM({ toUserId, message }) {
+  async sendTeamsDM({ toUserId, message, interactive = false }) {
     try {
       // 1. Cria ou abre chat 1:1
       const meAccounts = msalInstance.getAllAccounts();
       if (!meAccounts || meAccounts.length === 0) throw new Error('Sem conta ativa');
 
       // Busca o ID do usuário atual
-      const me = await this._fetch('GET', '/me');
+      const me = await this._fetch('GET', '/me', null, interactive);
       const myId = me.id;
 
       // Cria o chat (Graph cria se não existir, ou retorna o existente)
@@ -111,7 +127,7 @@ const GraphClient = {
             'user@odata.bind': `https://graph.microsoft.com/v1.0/users('${toUserId}')`
           }
         ]
-      });
+      }, interactive);
 
       const chatId = chat.id;
 
@@ -121,7 +137,7 @@ const GraphClient = {
           contentType: 'text',
           content: message
         }
-      });
+      }, interactive);
 
       return { success: true, canal: 'teams', destinatario: toUserId };
     } catch (e) {
@@ -130,9 +146,9 @@ const GraphClient = {
   },
 
   // ── Busca o ID Entra (Azure AD) de um usuário pelo e-mail ──
-  async getUserEntraId(email) {
+  async getUserEntraId(email, interactive = false) {
     try {
-      const result = await this._fetch('GET', `/users/${encodeURIComponent(email)}`);
+      const result = await this._fetch('GET', `/users/${encodeURIComponent(email)}`, null, interactive);
       return result.id;
     } catch {
       return null;
@@ -140,21 +156,22 @@ const GraphClient = {
   },
 
   // ── Método unificado: despacha para o canal correto ──
-  async dispatch({ canal, destinatario, subject, message, isHtml = false }) {
+  async dispatch({ canal, destinatario, subject, message, isHtml = false, interactive = false }) {
     if (canal === 'email') {
       return this.sendEmail({
         to: { email: destinatario.email, nome: destinatario.nome },
         subject,
         body: message,
-        isHtml
+        isHtml,
+        interactive
       });
     }
 
     if (canal === 'teams') {
       // Busca o Entra ID do usuário pelo e-mail
-      const entraId = await this.getUserEntraId(destinatario.email);
+      const entraId = await this.getUserEntraId(destinatario.email, interactive);
       if (!entraId) throw new Error(`Usuário ${destinatario.email} não encontrado no Entra ID.`);
-      return this.sendTeamsDM({ toUserId: entraId, message });
+      return this.sendTeamsDM({ toUserId: entraId, message, interactive });
     }
 
     throw new Error(`Canal desconhecido: ${canal}`);
