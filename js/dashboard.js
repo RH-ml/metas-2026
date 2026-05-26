@@ -221,26 +221,64 @@ const Dashboard = {
       }
     }
 
-    let metas = DataStore.getMetas().filter(m => m.tipo !== 'compartilhada');
+    let metas = DataStore.getMetas();
     
-    // Corporate section
+    // Corporate section — exclui compartilhadas do painel corporativo
     const corpMetas = metas.filter(m => m.tipo === 'corporativa');
-    const gatilhos = metas.filter(m => m.isGatilho === true);
+    const gatilhos = metas.filter(m => m.isGatilho === true && m.tipo !== 'compartilhada');
     const corpPesoTotal = corpMetas.reduce((s, m) => s + (parseFloat(m.peso) || 0), 0);
     const corpPerf = corpPesoTotal > 0 ? corpMetas.reduce((s, m) => s + ((DataStore.calcPerformance(m) || 0) * (parseFloat(m.peso) || 0)), 0) / corpPesoTotal : 0;
 
-    // Area section
+    // Area section — usa a mesma lógica de getFilteredMetas() do módulo Metas
     let areaMetas = [];
     if (this.currentArea === 'todas' || this.currentArea === 'all') {
       areaMetas = metas;
     } else if (this.currentArea) {
-      areaMetas = metas.filter(m => m.areaId === this.currentArea);
+      areaMetas = metas.filter(m => {
+        // Metas compartilhadas: aparece na área do co-responsável
+        if (m.tipo === 'compartilhada') {
+          if (Array.isArray(m.coresponsavelIds) && m.coresponsavelIds.length > 0) {
+            return m.coresponsavelIds.some(uid => {
+              const uArea = DataStore.getAreaAtual(uid);
+              return uArea && uArea.id === this.currentArea;
+            });
+          }
+          return false;
+        }
+        // Metas normais: usa a área atual do responsável (historico_areas) como fonte primária
+        if (m.responsavelId) {
+          const respArea = DataStore.getAreaAtual(m.responsavelId);
+          if (respArea) return respArea.id === this.currentArea;
+          return m.areaId === this.currentArea;
+        }
+        return m.areaId === this.currentArea;
+      });
     } else {
       areaMetas = [];
     }
 
-    const areaPesoTotal = areaMetas.reduce((s, m) => s + (parseFloat(m.peso) || 0), 0);
-    const areaPerf = areaPesoTotal > 0 ? areaMetas.reduce((s, m) => s + ((DataStore.calcPerformance(m) || 0) * (parseFloat(m.peso) || 0)), 0) / areaPesoTotal : 0;
+    // Ignorar peso das metas filhas de compostas e das compartilhadas no cálculo da nota global
+    const childIds = new Set();
+    areaMetas.forEach(m => {
+      if (m.tipo === 'composta' && Array.isArray(m.composicao)) {
+        m.composicao.forEach(c => childIds.add(c.metaId));
+      }
+    });
+
+    const areaMatasParaCalc = areaMetas.filter(m => {
+      const p = DataStore.calcPerformance(m);
+      return p !== null && m.valorAtual !== null;
+    });
+
+    const areaPesoTotal = areaMatasParaCalc.reduce((s, m) => {
+      const pesoEfetivo = childIds.has(m.id) || m.tipo === 'compartilhada' ? 0 : (parseFloat(m.peso) || 0);
+      return s + pesoEfetivo;
+    }, 0);
+
+    const areaPerf = areaPesoTotal > 0 ? areaMatasParaCalc.reduce((s, m) => {
+      const pesoEfetivo = childIds.has(m.id) || m.tipo === 'compartilhada' ? 0 : (parseFloat(m.peso) || 0);
+      return s + ((DataStore.calcPerformance(m) || 0) * pesoEfetivo);
+    }, 0) / areaPesoTotal : 0;
     
     const totalArea = areaMetas.length;
     let verdes = 0, laranjas = 0, vermelhas = 0;
