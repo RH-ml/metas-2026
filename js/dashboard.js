@@ -285,8 +285,8 @@ const Dashboard = {
     areaMetas.forEach(m => {
       const p = DataStore.calcPerformance(m);
       if (p !== null) {
-        if (p >= 80) verdes++;
-        else if (p >= 60) laranjas++;
+        if (p >= 100) verdes++;
+        else if (p >= 80) laranjas++;
         else vermelhas++;
       }
     });
@@ -377,7 +377,7 @@ const Dashboard = {
                 <div class="kpi-content">
                   <span class="kpi-title">Metas no Verde</span>
                   <strong class="kpi-value">${verdes}</strong>
-                  <span class="kpi-subtitle">>= 80%</span>
+                  <span class="kpi-subtitle">>= 100</span>
                 </div>
               </div>
               
@@ -386,7 +386,7 @@ const Dashboard = {
                  <div class="kpi-content">
                    <span class="kpi-title">Metas no Laranja</span>
                    <strong class="kpi-value">${laranjas}</strong>
-                   <span class="kpi-subtitle">60% a 79%</span>
+                   <span class="kpi-subtitle">80 a 99</span>
                  </div>
               </div>
               
@@ -395,7 +395,7 @@ const Dashboard = {
                  <div class="kpi-content">
                    <span class="kpi-title">Metas no Vermelho</span>
                    <strong class="kpi-value">${vermelhas}</strong>
-                   <span class="kpi-subtitle">< 60%</span>
+                   <span class="kpi-subtitle">< 80</span>
                  </div>
               </div>
             </div>
