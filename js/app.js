@@ -11,6 +11,10 @@ const App = {
     } catch (e) {
       console.error("Erro na sincronização inicial do DataStore:", e);
     }
+    // Inicia o motor de lembretes automaticamente
+    if (typeof LembretesEngine !== 'undefined') {
+      LembretesEngine.start();
+    }
     window.addEventListener('hashchange', () => this.handleRoute());
     this.handleRoute();
   },
@@ -34,7 +38,7 @@ const App = {
 
       const session = Auth.getSession() || {};
       const isAdmin = session.id === 'admin' || session.nivel === 'Admin';
-      if (!isAdmin && ['remuneracao', 'relatorios', 'configuracoes'].includes(hash)) {
+      if (!isAdmin && ['remuneracao', 'relatorios', 'configuracoes', 'lembretes'].includes(hash)) {
         this.navigate('dashboard');
         return;
       }
@@ -59,11 +63,12 @@ const App = {
     }
 
     const titles = {
-      dashboard: ['Dashboard', 'Visão geral da performance'],
-      metas: ['Metas', 'Gerencie e acompanhe as metas da organização'],
-      remuneracao: ['Remuneração Variável', 'Bônus, simulações e regras de pagamento'],
-      relatorios: ['Relatórios', 'Extração de dados e histórico de metas'],
-      configuracoes: ['Configurações', 'Cadastro de usuários, áreas e movimentações']
+      dashboard:    ['Dashboard', 'Visão geral da performance'],
+      metas:        ['Metas', 'Gerencie e acompanhe as metas da organização'],
+      remuneracao:  ['Remuneração Variável', 'Bônus, simulações e regras de pagamento'],
+      relatorios:   ['Relatórios', 'Extração de dados e histórico de metas'],
+      lembretes:    ['Central de Lembretes', 'Notificações automáticas via Teams e E-mail'],
+      configuracoes:['Configurações', 'Cadastro de usuários, áreas e movimentações']
     };
 
     const [title, subtitle] = titles[route] || ['Página', ''];
@@ -71,11 +76,12 @@ const App = {
     let pageContent = '';
     let showSearch = false;
     switch (route) {
-      case 'dashboard': pageContent = Dashboard.render(); break;
-      case 'metas': pageContent = Metas.render(); showSearch = true; break;
-      case 'remuneracao': pageContent = Remuneracao.render(); break;
-      case 'relatorios': pageContent = Relatorios.render(); break;
-      case 'configuracoes': pageContent = Configuracoes.render(); break;
+      case 'dashboard':    pageContent = Dashboard.render(); break;
+      case 'metas':        pageContent = Metas.render(); showSearch = true; break;
+      case 'remuneracao':  pageContent = Remuneracao.render(); break;
+      case 'relatorios':   pageContent = Relatorios.render(); break;
+      case 'lembretes':    pageContent = Lembretes.render(); break;
+      case 'configuracoes':pageContent = Configuracoes.render(); break;
       default: pageContent = '<div class="page-content"><h2>Página não encontrada</h2></div>';
     }
 

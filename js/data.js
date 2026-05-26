@@ -3,7 +3,7 @@
 // ============================================
 
 const DataStore = {
-  KEYS: { USERS: 'mp_users', METAS: 'mp_metas', ACOES: 'mp_acoes', BONUS: 'mp_bonus', REGRAS: 'mp_regras', AREAS: 'mp_areas', HISTORICO_AREAS: 'mp_hist_areas', SESSION: 'mp_session' },
+  KEYS: { USERS: 'mp_users', METAS: 'mp_metas', ACOES: 'mp_acoes', BONUS: 'mp_bonus', REGRAS: 'mp_regras', AREAS: 'mp_areas', HISTORICO_AREAS: 'mp_hist_areas', SESSION: 'mp_session', LEMBRETE_REGRAS: 'mp_lem_regras', LEMBRETE_TEMPLATES: 'mp_lem_templates', LEMBRETE_LOGS: 'mp_lem_logs', LEMBRETE_CHANNELS: 'mp_lem_channels' },
   DELETED_KEY: 'mp_deleted_ids', // Tombstone: IDs excluídos intencionalmente (evita restauração pelo merge do Firebase)
 
   // Registra um ID como excluído permanentemente
@@ -891,5 +891,121 @@ const DataStore = {
     bonus = Math.min(bonus, tetoValor);
 
     return { user, metas, perfPonderada: Math.round(perfPonderada * 10) / 10, elegivel, multiplicador, bonus: Math.round(bonus * 100) / 100, teto: tetoValor };
+  },
+
+  // ============================================================
+  // CENTRAL DE LEMBRETES — Helpers de CRUD
+  // ============================================================
+
+  getLembreteRegras() { return this.get(this.KEYS.LEMBRETE_REGRAS) || []; },
+  getLembreteTemplates() { return this.get(this.KEYS.LEMBRETE_TEMPLATES) || []; },
+  getLembreteLogs() { return this.get(this.KEYS.LEMBRETE_LOGS) || []; },
+  getLembreteChannels() {
+    const saved = this.get(this.KEYS.LEMBRETE_CHANNELS);
+    if (saved && saved.length > 0) return saved;
+    // Defaults
+    const defaults = [
+      { id: 'lc_email', tipo: 'email', nome: 'E-mail Corporativo (Microsoft 365)', ativo: true, icone: '📧' },
+      { id: 'lc_teams', tipo: 'teams', nome: 'Microsoft Teams (Mensagem Direta)', ativo: true, icone: '🟦' }
+    ];
+    this.set(this.KEYS.LEMBRETE_CHANNELS, defaults);
+    return defaults;
+  },
+
+  addLembreteRegra(regra) { return this.add(this.KEYS.LEMBRETE_REGRAS, regra); },
+  updateLembreteRegra(id, updates) { return this.update(this.KEYS.LEMBRETE_REGRAS, id, updates); },
+  removeLembreteRegra(id) { return this.remove(this.KEYS.LEMBRETE_REGRAS, id); },
+  getLembreteRegraById(id) { return this.getLembreteRegras().find(r => r.id === id); },
+
+  addLembreteTemplate(tpl) { return this.add(this.KEYS.LEMBRETE_TEMPLATES, tpl); },
+  updateLembreteTemplate(id, updates) { return this.update(this.KEYS.LEMBRETE_TEMPLATES, id, updates); },
+  removeLembreteTemplate(id) { return this.remove(this.KEYS.LEMBRETE_TEMPLATES, id); },
+  getLembreteTemplateById(id) { return this.getLembreteTemplates().find(t => t.id === id); },
+
+  addLembreteLog(log) { return this.add(this.KEYS.LEMBRETE_LOGS, log); },
+
+  // Calcula próxima execução de uma regra com base em frequência e horário
+  calcProximaExecucao(regra) {
+    const agora = new Date();
+    const [h, m] = (regra.horario || '08:00').split(':').map(Number);
+    const proxima = new Date();
+    proxima.setHours(h, m, 0, 0);
+
+    if (regra.frequencia === 'imediato') return agora.toISOString();
+    if (regra.frequencia === 'diario') {
+      if (proxima <= agora) proxima.setDate(proxima.getDate() + 1);
+      return proxima.toISOString();
+    }
+    if (regra.frequencia === 'semanal') {
+      const diasAlvo = regra.diasSemana && regra.diasSemana.length > 0 ? regra.diasSemana : [1];
+      let d = new Date(agora);
+      for (let i = 1; i <= 7; i++) {
+        d = new Date(agora);
+        d.setDate(agora.getDate() + i);
+        if (diasAlvo.includes(d.getDay())) break;
+      }
+      d.setHours(h, m, 0, 0);
+      return d.toISOString();
+    }
+    if (regra.frequencia === 'mensal') {
+      proxima.setMonth(proxima.getMonth() + 1, 1);
+      proxima.setHours(h, m, 0, 0);
+      return proxima.toISOString();
+    }
+    return proxima.toISOString();
+  },
+
+  // Resolve variáveis dinâmicas em templates: {{variavel}}
+  resolveTemplate(texto, vars) {
+    if (!texto) return '';
+    return texto.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] !== undefined ? vars[key] : `{{${key}}}`);
+  },
+
+  // Monta a lista de destinatários de uma regra, respeitando hierarquia
+  buildRecipientList(regra) {
+    const publico = regra.publicoAlvo || [];
+    const areasIds = regra.areasIds || [];
+    const users = this.getUsers();
+    const metas = this.getMetas();
+    const recipientMap = new Map(); // userId -> user
+
+    const addUser = (u) => { if (u && u.id) recipientMap.set(u.id, u); };
+
+    // Filtra metas pelas áreas configuradas na regra (ou todas se não especificado)
+    const metasFiltradas = areasIds.length > 0
+      ? metas.filter(m => areasIds.includes(m.areaId))
+      : metas;
+
+    metasFiltradas.forEach(meta => {
+      if (publico.includes('responsavel')) {
+        const u = this.getUserById(meta.responsavelId);
+        addUser(u);
+      }
+      if (publico.includes('gestor')) {
+        // Gestor = usuário de nível Gerência ou Diretoria que está na mesma área
+        const respArea = meta.areaId ? this.getAreaById(meta.areaId) : null;
+        if (respArea) {
+          users.filter(u => (u.nivel === 'Gerência' || u.nivel === 'Diretoria')).forEach(u => {
+            const uArea = this.getAreaAtual(u.id);
+            if (uArea && (uArea.id === respArea.id || uArea.id === respArea.parentId)) addUser(u);
+          });
+        }
+      }
+    });
+
+    if (publico.includes('diretoria')) {
+      users.filter(u => u.nivel === 'Diretoria').forEach(addUser);
+    }
+    if (publico.includes('corporativo')) {
+      users.filter(u => u.nivel === 'Admin' || u.nivel === 'Diretoria').forEach(addUser);
+    }
+    if (publico.includes('areas_especificas') && areasIds.length > 0) {
+      users.forEach(u => {
+        const uArea = this.getAreaAtual(u.id);
+        if (uArea && areasIds.includes(uArea.id)) addUser(u);
+      });
+    }
+
+    return Array.from(recipientMap.values());
   }
 };
