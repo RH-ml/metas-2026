@@ -231,13 +231,27 @@ const Lembretes = {
   async testDispatch(id) {
     const regra = DataStore.getLembreteRegraById(id);
     if (!regra) return;
-    Components.toast(`⏳ Disparando "${regra.nome}"...`, 'info', 3000);
+
+    // ── Pré-autenticação Microsoft (direto do clique — browser permite popup aqui) ──
+    if (regra.canais && regra.canais.length > 0) {
+      try {
+        Components.toast('🔐 Verificando autenticação Microsoft...', 'info', 3000);
+        await GraphClient.getAccessToken(true);
+      } catch (authErr) {
+        Components.toast(`❌ Falha na autenticação Microsoft: ${authErr.message}`, 'error', 8000);
+        return;
+      }
+    }
+
+    Components.toast(`⏳ Disparando "${regra.nome}"...`, 'info', 4000);
     try {
-      await LembretesEngine.executeRegra(regra, true, true);
+      // interactive=false: já autenticado acima; engine não precisa de novo popup
+      await LembretesEngine.executeRegra(regra, true, false);
       Components.toast(`✅ Lembrete "${regra.nome}" disparado com sucesso!`, 'success');
       App.refreshPage();
     } catch (e) {
       Components.toast(`❌ Erro ao disparar: ${e.message}`, 'error', 6000);
+      App.refreshPage(); // Atualiza para mostrar logs de erro
     }
   },
 
@@ -485,12 +499,12 @@ Acesse o sistema: {{link_sistema}}">${tpl?.corpo || ''}</textarea>
       nome_usuario: 'João Silva',
       nome_meta: 'Garantir Contratação VGV',
       codigo_meta: 'MET0067',
-      competencia: 'maio de 2026',
-      prazo: 'Mês 12',
+      competencia: 'abril de 2026',
+      prazo: '—',
       gestor: 'Maria Fernanda',
       area: '1.4.1 - Gerência de Novos Negócios',
       link_sistema: window.location.origin + window.location.pathname,
-      lista_metas: '• [MET0067] Garantir Contratação VGV (Prazo: Mês 12)\n• [MET0068] Desenvolvimento de Líderes (Prazo: Mês 12)'
+      lista_metas: '1. [MET0067] Garantir Contratação VGV\n2. [MET0068] Desenvolvimento de Líderes'
     };
     return DataStore.resolveTemplate(corpo, vars);
   },

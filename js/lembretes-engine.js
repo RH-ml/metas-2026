@@ -9,10 +9,9 @@ const LembretesEngine = {
 
   // ── Inicia o scheduler automático ──
   start() {
-    if (this._intervalId) return; // já rodando
+    if (this._intervalId) return;
     console.log('🔔 LembretesEngine iniciado.');
     this._intervalId = setInterval(() => this.tick(), this._CHECK_INTERVAL_MS);
-    // Roda uma vez imediatamente ao iniciar
     this.tick();
   },
 
@@ -24,11 +23,10 @@ const LembretesEngine = {
     }
   },
 
-  // ── Ciclo principal ── avalia todas as regras ativas ──
+  // ── Ciclo principal ──
   async tick() {
     const regras = DataStore.getLembreteRegras().filter(r => r.ativo);
-    const agora = new Date();
-
+    const agora  = new Date();
     for (const regra of regras) {
       try {
         const proxima = regra.proximaExecucao ? new Date(regra.proximaExecucao) : null;
@@ -41,164 +39,190 @@ const LembretesEngine = {
     }
   },
 
-  // ── Executa uma regra específica (avalia condição e dispara) ──
+  // ── Executa uma regra específica ──
+  // forceDispatch=true → botão "Testar" (ignora janela de 5º dia útil)
+  // interactive=false  → autenticação já feita pelo testDispatch antes de entrar aqui
   async executeRegra(regra, forceDispatch = false, interactive = false) {
     const destinatarios = DataStore.buildRecipientList(regra);
-    const metasAfetadas = this.evaluateEvento(regra);
+    let   metasAfetadas = this.evaluateEvento(regra, forceDispatch);
 
-    // Atualiza última/próxima execução
-    const agora = new Date().toISOString();
-    const proxima = DataStore.calcProximaExecucao(regra);
-    DataStore.updateLembreteRegra(regra.id, { ultimaExecucao: agora, proximaExecucao: proxima });
+    // Salva última/próxima execução
+    DataStore.updateLembreteRegra(regra.id, {
+      ultimaExecucao  : new Date().toISOString(),
+      proximaExecucao : DataStore.calcProximaExecucao(regra)
+    });
 
-    if (metasAfetadas.length === 0 && !forceDispatch) return; // Nada a notificar
+    if (metasAfetadas.length === 0 && !forceDispatch) return;
 
-    const template = DataStore.getLembreteTemplateById(regra.templateId);
-    const canais = regra.canais || [];
+    // Disparo forçado sem metas → fallback: primeiras 5 metas disponíveis
+    if (metasAfetadas.length === 0 && forceDispatch) {
+      const todas  = DataStore.getMetas();
+      const areas  = regra.areasIds || [];
+      metasAfetadas = areas.length > 0
+        ? todas.filter(m => areas.includes(m.areaId)).slice(0, 5)
+        : todas.slice(0, 5);
+    }
+
+    if (destinatarios.length === 0 || metasAfetadas.length === 0) return;
+
+    const template    = DataStore.getLembreteTemplateById(regra.templateId);
+    const canais      = regra.canais || [];
     const linkSistema = window.location.origin + window.location.pathname;
-    const competencia = this._getCompetenciaAtual();
 
-    // Dispara para cada destinatário × cada canal
+    // Para "meta_sem_resultado" a competência é o mês ANTERIOR (mês cobrado)
+    const competencia = regra.evento === 'meta_sem_resultado'
+      ? this._getCompetenciaMesAnterior()
+      : this._getCompetenciaAtual();
+
+    // ── UM ÚNICO envio por destinatário com TODAS as suas metas ──
     for (const user of destinatarios) {
-      const userMetas = metasAfetadas.filter(m => m.responsavelId === user.id);
-      const metasParaMsg = userMetas.length > 0 ? userMetas : (forceDispatch ? metasAfetadas.slice(0, 3) : []);
+
+      const userMetas    = metasAfetadas.filter(m => m.responsavelId === user.id);
+      const metasParaMsg = userMetas.length > 0
+        ? userMetas
+        : (forceDispatch ? metasAfetadas : []);
+
       if (metasParaMsg.length === 0) continue;
+
+      // Lista numerada SEM prazo (apenas código e título)
+      const listaFormatada = metasParaMsg.map((m, i) => {
+        const cod = m.codigo ? `[${m.codigo}] ` : '';
+        return `${i + 1}. ${cod}${m.titulo}`;
+      }).join('\n');
+
+      const primeiraArea = DataStore.getAreaById(metasParaMsg[0]?.areaId);
+
+      const vars = {
+        nome_usuario : user.nome,
+        nome_meta    : metasParaMsg.length === 1
+          ? metasParaMsg[0].titulo
+          : `${metasParaMsg.length} metas pendentes`,
+        codigo_meta  : metasParaMsg.map(m => m.codigo).filter(Boolean).join(', ') || '—',
+        competencia,
+        prazo        : [...new Set(
+          metasParaMsg.map(m => m.mesFim ? `Mês ${m.mesFim}` : '').filter(Boolean)
+        )].join(', ') || '—',
+        gestor       : this._getNomeGestor(user),
+        area         : primeiraArea
+          ? `${primeiraArea.codigo} - ${primeiraArea.nome}`
+          : this._getNomeArea(user),
+        link_sistema : linkSistema,
+        lista_metas  : listaFormatada
+      };
+
+      const assunto = DataStore.resolveTemplate(
+        template?.assunto || `⚠️ Lembrete: ${regra.nome}`,
+        vars
+      );
+      const corpo = DataStore.resolveTemplate(
+        template?.corpo ||
+          `Olá {{nome_usuario}},\n\nVocê possui as seguintes metas pendentes referentes a {{competencia}}:\n\n{{lista_metas}}\n\nAcesse o sistema: {{link_sistema}}`,
+        vars
+      );
+
+      const metaIds    = metasParaMsg.map(m => m.id).join(', ');
+      const metaTitulo = `${metasParaMsg.length} meta(s): ${metasParaMsg.map(m => m.titulo).join('; ')}`;
 
       for (const canal of canais) {
         try {
-          // Formata as variáveis consolidadas
-          let nomeMeta = '';
-          let codigoMeta = '';
-          let prazo = '';
-          let area = '';
-          let listaMetas = '';
-
-          const listaMetasText = metasParaMsg.map(m => {
-            const cod = m.codigo ? `[${m.codigo}] ` : '';
-            const prazoStr = m.mesFim ? ` (Prazo: Mês ${m.mesFim})` : '';
-            return `• ${cod}${m.titulo}${prazoStr}`;
-          }).join('\n');
-
-          if (metasParaMsg.length === 1) {
-            const m = metasParaMsg[0];
-            nomeMeta = m.titulo;
-            codigoMeta = m.codigo || '—';
-            prazo = m.mesFim ? `Mês ${m.mesFim}` : '—';
-            const a = DataStore.getAreaById(m.areaId);
-            area = a ? `${a.codigo} - ${a.nome}` : '—';
-            listaMetas = `• ${m.codigo ? `[${m.codigo}] ` : ''}${m.titulo}`;
-          } else {
-            nomeMeta = '\n' + listaMetasText;
-            codigoMeta = metasParaMsg.map(m => m.codigo).filter(Boolean).join(', ') || '—';
-            prazo = metasParaMsg.map(m => m.mesFim ? `Mês ${m.mesFim}` : '').filter(Boolean).filter((v,i,a) => a.indexOf(v)===i).join(', ') || '—';
-            area = metasParaMsg.map(m => {
-              const a = DataStore.getAreaById(m.areaId);
-              return a ? `${a.codigo} - ${a.nome}` : '';
-            }).filter(Boolean).filter((v,i,a) => a.indexOf(v)===i).join(', ') || '—';
-            listaMetas = listaMetasText;
-          }
-
-          const vars = {
-            nome_usuario: user.nome,
-            nome_meta: nomeMeta,
-            codigo_meta: codigoMeta,
-            competencia,
-            prazo,
-            gestor: this._getNomeGestor(user),
-            area,
-            link_sistema: linkSistema,
-            lista_metas: listaMetas
-          };
-
-          const assunto = DataStore.resolveTemplate(
-            template?.assunto || `⚠️ Lembrete: ${regra.nome}`,
-            vars
-          );
-          const corpo = DataStore.resolveTemplate(
-            template?.corpo || `Olá {{nome_usuario}},\n\nVocê possui as seguintes pendências de metas:\n\n{{lista_metas}}\n\nAcesse: {{link_sistema}}`,
-            vars
-          );
-
           await GraphClient.dispatch({
             canal,
             destinatario: { email: user.email, nome: user.nome },
-            subject: assunto,
-            message: corpo,
-            isHtml: false,
+            subject : assunto,
+            message : corpo,
+            isHtml  : false,
             interactive
           });
 
-          // Adiciona log consolidado
           DataStore.addLembreteLog({
-            regraId: regra.id,
-            regraNome: regra.nome,
-            dataHora: new Date().toISOString(),
+            regraId          : regra.id,
+            regraNome        : regra.nome,
+            dataHora         : new Date().toISOString(),
             canal,
-            destinatarioId: user.id,
-            destinatarioNome: user.nome,
+            destinatarioId   : user.id,
+            destinatarioNome : user.nome,
             destinatarioEmail: user.email,
-            metaId: metasParaMsg.map(m => m.id).join(', '),
-            metaTitulo: metasParaMsg.map(m => m.titulo).join(', '),
-            status: 'enviado',
-            erro: null
+            metaId           : metaIds,
+            metaTitulo,
+            status           : 'enviado',
+            erro             : null
           });
 
         } catch (err) {
           DataStore.addLembreteLog({
-            regraId: regra.id,
-            regraNome: regra.nome,
-            dataHora: new Date().toISOString(),
+            regraId          : regra.id,
+            regraNome        : regra.nome,
+            dataHora         : new Date().toISOString(),
             canal,
-            destinatarioId: user.id,
-            destinatarioNome: user.nome,
+            destinatarioId   : user.id,
+            destinatarioNome : user.nome,
             destinatarioEmail: user.email,
-            metaId: metasParaMsg.map(m => m.id).join(', '),
-            metaTitulo: metasParaMsg.map(m => m.titulo).join(', ') || '—',
-            status: 'erro',
-            erro: err.message
+            metaId           : metaIds,
+            metaTitulo,
+            status           : 'erro',
+            erro             : err.message
           });
-          if (interactive) throw err;
+          // Não interrompe: continua para próximo canal/usuário
         }
       }
     }
   },
 
   // ── Avalia o evento/gatilho e retorna as metas afetadas ──
-  evaluateEvento(regra) {
+  // forceDispatch=true ignora a janela do 5º dia útil (usado pelo botão Testar)
+  evaluateEvento(regra, forceDispatch = false) {
     const metas = DataStore.getMetas();
     const areasIds = regra.areasIds || [];
     const metasFiltradas = areasIds.length > 0
       ? metas.filter(m => areasIds.includes(m.areaId))
       : metas;
 
-    const agora = new Date();
-    const mesAtual = agora.getMonth(); // 0-based
+    const agora    = new Date();
+    const mesAtual = agora.getMonth(); // 0-based: 0=Jan … 11=Dez
 
     switch (regra.evento) {
+
+      // ──────────────────────────────────────────────────────────────────
+      // REGRA: Metas sem preenchimento
+      //   • Cobrar o mês ANTERIOR (Jan→cobrar em Fev, Fev→cobrar em Mar…)
+      //   • Só disparar a partir do 5º dia útil do mês corrente
+      //   • Metas marcadas como N/A NÃO são cobradas
+      // ──────────────────────────────────────────────────────────────────
       case 'meta_sem_resultado': {
-        // Metas sem resultado (R) lançado no mês corrente
+        // Índice do mês a cobrar (mês anterior, com wrap de Dez→Jan)
+        const mesPendente = mesAtual === 0 ? 11 : mesAtual - 1;
+
+        // Janela de cobrança: a partir do 5º dia útil do mês corrente
+        if (!forceDispatch) {
+          const quintoUtil = this._getNthBusinessDay(agora.getFullYear(), mesAtual, 5);
+          if (agora < quintoUtil) return []; // ainda não chegou o prazo
+        }
+
         return metasFiltradas.filter(m => {
-          if (!m.mesesData || !m.mesesData[mesAtual]) return false;
-          const pontual = m.mesesData[mesAtual].pontual;
-          return pontual && (pontual.r === null || pontual.r === undefined) && !pontual.na;
+          if (!m.mesesData) return false;
+          const mesDado = m.mesesData[mesPendente];
+          if (!mesDado) return false;
+          const pontual = mesDado.pontual;
+          if (!pontual) return false;
+          // Não cobrar se marcado como N/A
+          if (pontual.na) return false;
+          // Cobrar somente se o resultado (r) não foi preenchido
+          return pontual.r === null || pontual.r === undefined || pontual.r === '';
         });
       }
 
       case 'prazo_vencendo': {
-        // Metas com prazo (mesFim) nos próximos N dias
         const diasAlerta = regra.parametros?.diasAlerta || 7;
         const limiteData = new Date();
         limiteData.setDate(limiteData.getDate() + diasAlerta);
         return metasFiltradas.filter(m => {
           if (!m.mesFim) return false;
-          const mesLimite = parseInt(m.mesFim);
-          const dataFim = new Date(agora.getFullYear(), mesLimite - 1, 28); // último dia aprox.
+          const dataFim = new Date(agora.getFullYear(), parseInt(m.mesFim) - 1, 28);
           return dataFim >= agora && dataFim <= limiteData;
         });
       }
 
       case 'resultado_abaixo': {
-        // Metas com nota abaixo do limiar configurado
         const limiar = regra.parametros?.limiarNota || 80;
         return metasFiltradas.filter(m => {
           const perf = DataStore.calcPerformance(m);
@@ -207,48 +231,42 @@ const LembretesEngine = {
       }
 
       case 'sem_atualizacao': {
-        // Metas sem edição há N dias
         const diasSemUpdate = regra.parametros?.diasSemUpdate || 30;
         const limite = new Date();
         limite.setDate(limite.getDate() - diasSemUpdate);
         return metasFiltradas.filter(m => {
-          if (!m.atualizadoEm) return true; // nunca atualizado
+          if (!m.atualizadoEm) return true;
           return new Date(m.atualizadoEm) < limite;
         });
       }
 
       case 'plano_vencido': {
-        // Planos de ação com prazo ultrapassado e progresso < 100%
         const acoes = DataStore.get(DataStore.KEYS.ACOES) || [];
         const acoesVencidas = acoes.filter(a => {
           if (!a.prazo || (a.progresso || 0) >= 100) return false;
           return new Date(a.prazo) < agora;
         });
-        // Retorna as metas correspondentes
         const metaIds = new Set(acoesVencidas.map(a => a.metaId));
         return metasFiltradas.filter(m => metaIds.has(m.id));
       }
 
       case 'fechamento_ciclo': {
-        // Último dia do mês corrente
         const ultimoDia = new Date(agora.getFullYear(), agora.getMonth() + 1, 0);
-        const isUltimoDia = agora.getDate() === ultimoDia.getDate() && agora.getMonth() === ultimoDia.getMonth();
+        const isUltimoDia = agora.getDate() === ultimoDia.getDate() &&
+                            agora.getMonth() === ultimoDia.getMonth();
         return isUltimoDia ? metasFiltradas : [];
       }
 
       case 'abertura_ciclo': {
-        // Primeiro dia do mês
-        const isPrimeiroDia = agora.getDate() === 1;
-        return isPrimeiroDia ? metasFiltradas : [];
+        return agora.getDate() === 1 ? metasFiltradas : [];
       }
 
       case 'atraso_evidencia': {
-        // Meses com resultado mas sem anexo
         return metasFiltradas.filter(m => {
           if (!m.mesesData) return false;
           return m.mesesData.some((mes, idx) => {
             if (idx > mesAtual) return false;
-            const temR = mes.pontual && mes.pontual.r !== null;
+            const temR     = mes.pontual && mes.pontual.r !== null && mes.pontual.r !== undefined;
             const semAnexo = !mes.anexos || mes.anexos.length === 0;
             return temR && semAnexo;
           });
@@ -260,9 +278,33 @@ const LembretesEngine = {
     }
   },
 
-  // ── Helpers internos ──
+  // ── Helpers ──────────────────────────────────────────────────────────
+
+  // Retorna a data do N-ésimo dia útil (seg–sex) de um dado mês/ano
+  _getNthBusinessDay(year, month, n) {
+    let count = 0;
+    let day   = 1;
+    while (true) {
+      const d   = new Date(year, month, day);
+      const dow = d.getDay(); // 0=Dom, 6=Sáb
+      if (dow !== 0 && dow !== 6) {
+        count++;
+        if (count === n) return d;
+      }
+      day++;
+    }
+  },
+
+  // Retorna "mês de ano" do mês CORRENTE (ex: "maio de 2026")
   _getCompetenciaAtual() {
+    return new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  },
+
+  // Retorna "mês de ano" do mês ANTERIOR — usado no evento meta_sem_resultado
+  _getCompetenciaMesAnterior() {
     const d = new Date();
+    d.setDate(1);          // evita problema de dias (31 → 31 de fevereiro)
+    d.setMonth(d.getMonth() - 1);
     return d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
   },
 
