@@ -7,20 +7,21 @@ const GraphClient = {
   GRAPH_BASE: 'https://graph.microsoft.com/v1.0',
   _tokenCache: null,
 
-  // ── Obtém token de acesso com escopos de envio (incremental consent) ──
-  // ── Obtém token de acesso com escopos de envio (incremental consent) ──
+  // ── Escopos necessários para e-mail + Teams DM + busca de usuários ──
+  _SCOPES: ['Mail.Send', 'Chat.ReadWrite', 'User.Read', 'User.ReadBasic.All'],
+
+  // ── Obtém token de acesso ──────────────────────────────────────────────
   async getAccessToken(interactive = false) {
     if (!window.msalInstance) {
       throw new Error('MSAL não inicializado. Faça login com Microsoft primeiro.');
     }
 
     let accounts = msalInstance.getAllAccounts();
+
     if (!accounts || accounts.length === 0) {
       if (interactive) {
         try {
-          const loginResponse = await msalInstance.loginPopup({
-            scopes: ['Mail.Send', 'Chat.ReadWrite', 'User.Read']
-          });
+          const loginResponse = await msalInstance.loginPopup({ scopes: this._SCOPES });
           accounts = [loginResponse.account];
         } catch (loginError) {
           throw new Error('Não foi possível vincular sua conta Microsoft: ' + loginError.message);
@@ -30,18 +31,13 @@ const GraphClient = {
       }
     }
 
-    const request = {
-      scopes: ['Mail.Send', 'Chat.ReadWrite', 'User.Read'],
-      account: accounts[0]
-    };
+    const request = { scopes: this._SCOPES, account: accounts[0] };
 
     try {
-      // Tenta renovar silenciosamente
       const response = await msalInstance.acquireTokenSilent(request);
       this._tokenCache = response.accessToken;
       return response.accessToken;
     } catch (silentError) {
-      // Se falhar silenciosamente e for interativo, solicita interativo (popup)
       if (interactive) {
         try {
           const response = await msalInstance.acquireTokenPopup(request);
@@ -56,7 +52,8 @@ const GraphClient = {
     }
   },
 
-  // ── Requisição autenticada à Graph API ──
+  // ── Requisição autenticada à Graph API ──────────────────────────────
+  // Retorna null para 201/204 sem corpo, ou o JSON parseado
   async _fetch(method, endpoint, body = null, interactive = false) {
     const token = await this.getAccessToken(interactive);
     const opts = {
@@ -67,17 +64,36 @@ const GraphClient = {
       }
     };
     if (body) opts.body = JSON.stringify(body);
+
     const res = await fetch(`${this.GRAPH_BASE}${endpoint}`, opts);
+
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(`Graph API ${method} ${endpoint} falhou: ${err.error?.message || res.status}`);
+      let errMsg = `HTTP ${res.status}`;
+      try {
+        const errBody = await res.json();
+        errMsg = errBody?.error?.message || errBody?.error?.code || errMsg;
+      } catch (_) { /* resposta sem corpo JSON */ }
+      throw new Error(`Graph API ${method} ${endpoint}: ${errMsg}`);
     }
+
+    // Respostas sem corpo (204 No Content, 201 sem body)
     if (res.status === 204) return null;
-    return res.json();
+
+    const ct = res.headers.get('content-type') || '';
+    if (!ct.includes('application/json')) return null;
+
+    const text = await res.text();
+    if (!text || text.trim() === '') return null;
+
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      console.warn('[GraphClient] Resposta não-JSON:', text.slice(0, 200));
+      return null;
+    }
   },
 
-  // ── Envia e-mail via Outlook / Microsoft 365 ──
-  // to: { email, nome }  |  subject: string  |  body: string (HTML ou texto)
+  // ── Envia e-mail via Outlook / Microsoft 365 ────────────────────────
   async sendEmail({ to, subject, body, isHtml = false, interactive = false }) {
     const payload = {
       message: {
@@ -101,62 +117,70 @@ const GraphClient = {
     return { success: true, canal: 'email', destinatario: to.email };
   },
 
-  // ── Envia mensagem direta (DM) via Microsoft Teams ──
-  async sendTeamsDM({ toUserId, message, interactive = false }) {
-    try {
-      // 1. Cria ou abre chat 1:1
-      const meAccounts = msalInstance.getAllAccounts();
-      if (!meAccounts || meAccounts.length === 0) throw new Error('Sem conta ativa');
-
-      // Busca o ID do usuário atual
-      const me = await this._fetch('GET', '/me', null, interactive);
-      const myId = me.id;
-
-      // Cria o chat (Graph cria se não existir, ou retorna o existente)
-      const chat = await this._fetch('POST', '/chats', {
-        chatType: 'oneOnOne',
-        members: [
-          {
-            '@odata.type': '#microsoft.graph.aadUserConversationMember',
-            roles: ['owner'],
-            'user@odata.bind': `https://graph.microsoft.com/v1.0/users('${myId}')`
-          },
-          {
-            '@odata.type': '#microsoft.graph.aadUserConversationMember',
-            roles: ['owner'],
-            'user@odata.bind': `https://graph.microsoft.com/v1.0/users('${toUserId}')`
-          }
-        ]
-      }, interactive);
-
-      const chatId = chat.id;
-
-      // 2. Envia a mensagem
-      await this._fetch('POST', `/chats/${chatId}/messages`, {
-        body: {
-          contentType: 'text',
-          content: message
-        }
-      }, interactive);
-
-      return { success: true, canal: 'teams', destinatario: toUserId };
-    } catch (e) {
-      throw new Error('Falha ao enviar Teams DM: ' + e.message);
-    }
-  },
-
-  // ── Busca o ID Entra (Azure AD) de um usuário pelo e-mail ──
+  // ── Busca o ID Entra (Azure AD) de um usuário pelo e-mail ───────────
+  // Usa $select para minimizar dados trafegados
   async getUserEntraId(email, interactive = false) {
     try {
-      const result = await this._fetch('GET', `/users/${encodeURIComponent(email)}`, null, interactive);
-      return result.id;
-    } catch {
+      const result = await this._fetch(
+        'GET',
+        `/users/${encodeURIComponent(email)}?$select=id,displayName,mail`,
+        null,
+        interactive
+      );
+      return result?.id || null;
+    } catch (e) {
+      console.warn(`[GraphClient] Usuário não encontrado no Entra: ${email}`, e.message);
       return null;
     }
   },
 
-  // ── Método unificado: despacha para o canal correto ──
+  // ── Envia mensagem direta (DM) via Microsoft Teams ──────────────────
+  async sendTeamsDM({ toUserId, message, interactive = false }) {
+    // 1. ID do usuário autenticado (remetente)
+    const me   = await this._fetch('GET', '/me?$select=id', null, interactive);
+    const myId = me?.id;
+    if (!myId) throw new Error('Não foi possível identificar o usuário autenticado.');
+
+    // Evita enviar DM para si mesmo (caso raro)
+    if (myId === toUserId) {
+      console.warn('[GraphClient] Destinatário é o próprio remetente; DM ignorada.');
+      return { success: true, canal: 'teams', destinatario: toUserId, skipped: true };
+    }
+
+    // 2. Cria ou abre chat 1:1 (Graph retorna o existente se já houver)
+    const chat = await this._fetch('POST', '/chats', {
+      chatType: 'oneOnOne',
+      members: [
+        {
+          '@odata.type': '#microsoft.graph.aadUserConversationMember',
+          roles: ['owner'],
+          'user@odata.bind': `https://graph.microsoft.com/v1.0/users('${myId}')`
+        },
+        {
+          '@odata.type': '#microsoft.graph.aadUserConversationMember',
+          roles: ['owner'],
+          'user@odata.bind': `https://graph.microsoft.com/v1.0/users('${toUserId}')`
+        }
+      ]
+    }, interactive);
+
+    const chatId = chat?.id;
+    if (!chatId) throw new Error('Não foi possível criar/obter o chat no Teams.');
+
+    // 3. Envia a mensagem
+    await this._fetch('POST', `/chats/${chatId}/messages`, {
+      body: {
+        contentType: 'text',
+        content: message
+      }
+    }, interactive);
+
+    return { success: true, canal: 'teams', destinatario: toUserId };
+  },
+
+  // ── Método unificado: despacha para o canal correto ─────────────────
   async dispatch({ canal, destinatario, subject, message, isHtml = false, interactive = false }) {
+
     if (canal === 'email') {
       return this.sendEmail({
         to: { email: destinatario.email, nome: destinatario.nome },
@@ -168,9 +192,13 @@ const GraphClient = {
     }
 
     if (canal === 'teams') {
-      // Busca o Entra ID do usuário pelo e-mail
       const entraId = await this.getUserEntraId(destinatario.email, interactive);
-      if (!entraId) throw new Error(`Usuário ${destinatario.email} não encontrado no Entra ID.`);
+      if (!entraId) {
+        throw new Error(
+          `Usuário ${destinatario.email} não encontrado no Entra ID. ` +
+          `Verifique se o e-mail está cadastrado na organização e se a permissão User.ReadBasic.All foi concedida.`
+        );
+      }
       return this.sendTeamsDM({ toUserId: entraId, message, interactive });
     }
 
