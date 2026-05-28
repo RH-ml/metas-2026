@@ -67,19 +67,11 @@ const Lembretes = {
     return `
       <div class="page-content fade-in" style="padding-top:10px;">
 
-        <!-- KPI Bar -->
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">
-          ${this._kpi('🔔', 'Regras Cadastradas', regras.length, 'Total configurado')}
-          ${this._kpi('✅', 'Regras Ativas', ativas, 'Rodando agora')}
-          ${this._kpi('📨', 'Disparos (30d)', disparos30d, 'Últimos 30 dias', 'primary')}
-          ${this._kpi('❌', 'Erros (30d)', erros30d, 'Falhas de envio', erros30d > 0 ? 'danger' : 'success')}
-        </div>
-
         <!-- Tabs -->
         <div style="display:flex;gap:4px;background:var(--bg-2);padding:6px;border-radius:var(--radius);margin-bottom:16px;width:fit-content;border:1px solid rgba(0,0,0,0.06);">
-          ${this._tab('regras',    '📋 Regras de Notificação', regras.length)}
-          ${this._tab('templates', '✏️ Templates de Mensagem',  templates.length)}
-          ${this._tab('logs',      '📊 Logs e Auditoria',       logs.length)}
+          ${this._tab('regras',    'Regras de Notificação', regras.length)}
+          ${this._tab('templates', 'Templates de Mensagem',  templates.length)}
+          ${this._tab('logs',      'Logs e Auditoria',       logs.length)}
         </div>
 
         <!-- Content by tab -->
