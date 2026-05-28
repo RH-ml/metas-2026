@@ -68,10 +68,12 @@ const Lembretes = {
       <div class="page-content fade-in" style="padding-top:10px;">
 
         <!-- Tabs -->
-        <div style="display:flex;gap:4px;background:var(--bg-2);padding:6px;border-radius:var(--radius);margin-bottom:16px;width:fit-content;border:1px solid rgba(0,0,0,0.06);">
-          ${this._tab('regras',    'Regras de Notificação', regras.length)}
-          ${this._tab('templates', 'Templates de Mensagem',  templates.length)}
-          ${this._tab('logs',      'Logs e Auditoria',       logs.length)}
+        <div class="page-actions">
+          <div class="filter-tabs">
+            ${this._tab('regras',    'Regras de Notificação', regras.length)}
+            ${this._tab('templates', 'Templates de Mensagem',  templates.length)}
+            ${this._tab('logs',      'Logs e Auditoria',       logs.length)}
+          </div>
         </div>
 
         <!-- Content by tab -->
@@ -102,12 +104,7 @@ const Lembretes = {
 
   _tab(id, label, count) {
     const active = this.currentTab === id;
-    return `
-      <button onclick="Lembretes.setTab('${id}')" style="
-        padding:8px 16px;border-radius:var(--radius-sm);border:none;cursor:pointer;font-size:0.82rem;font-weight:600;transition:all .2s;
-        background:${active ? 'var(--primary)' : 'transparent'};
-        color:${active ? '#fff' : 'var(--text-3)'};
-      ">${label} <span style="background:rgba(255,255,255,0.2);padding:1px 6px;border-radius:10px;font-size:0.72rem;">${count}</span></button>`;
+    return `<button class="filter-tab ${active ? 'active' : ''}" onclick="Lembretes.setTab('${id}')">${label} <span style="font-size:0.72rem;opacity:0.75;">${count}</span></button>`;
   },
 
   setTab(tab) {
