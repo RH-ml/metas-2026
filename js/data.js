@@ -125,12 +125,12 @@ const DataStore = {
 
     // Recálculo global de migração: roda UMA ÚNICA VEZ por versão de código.
     // Garante retroatividade dos bugfixes sem sobrescrever dados válidos em cargas subsequentes.
-    const MIGRATION_KEY = 'mp_migration_recalc_v4';
+    const MIGRATION_KEY = 'mp_migration_recalc_v5';
     if (!localStorage.getItem(MIGRATION_KEY)) {
-      console.log('🔧 Executando migração de dados v4 (única vez)...');
+      console.log('🔧 Executando migração de dados v5 (única vez) — persistindo mesesData e corrigindo P...');
       this.globalRecalcMetas();
       localStorage.setItem(MIGRATION_KEY, new Date().toISOString());
-      console.log('✅ Migração v4 concluída.');
+      console.log('✅ Migração v5 concluída.');
     }
   },
 
@@ -482,7 +482,7 @@ const DataStore = {
              meta.mesesData.forEach((m, i) => {
                 const sMonth = sourceMeta.mesesData[i];
                 if (sMonth) {
-                   // Cópia profunda dos dados pontuais e acumulados
+                   // Cópia profunda dos dados pontuais e acumulados da origem (fonte da verdade)
                    if (sMonth.pontual) {
                       m.pontual = { ...sMonth.pontual };
                    }

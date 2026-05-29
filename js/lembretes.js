@@ -444,8 +444,8 @@ const Lembretes = {
           <div class="form-group">
             <label class="form-label">Canal *</label>
             <select class="form-input" name="canal" required>
-              <option value="email" ${tpl?.canal === 'email' ? 'selected' : ''}>📧 E-mail</option>
-              <option value="teams" ${tpl?.canal === 'teams' ? 'selected' : ''}>🟦 Microsoft Teams</option>
+              <option value="email" ${tpl?.canal === 'email' ? 'selected' : ''}>E-mail</option>
+              <option value="teams" ${tpl?.canal === 'teams' ? 'selected' : ''}>Microsoft Teams</option>
             </select>
           </div>
           <div class="form-group form-full">

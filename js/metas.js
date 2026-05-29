@@ -88,8 +88,10 @@ const Metas = {
     const perf = DataStore.calcPerformance(meta);
     const notaPond = (perf * (meta.peso || 0)) / 100;
     
-    // Obter dados do último mês com dados simulados
-    const lastData = meta.mesesData ? [...meta.mesesData].reverse().find(m => m.acumulado && m.acumulado.r !== null) || meta.mesesData[11] : null;
+    // Obter dados do último mês com resultado real OU marcado como N/A (qualquer apontamento)
+    const lastData = meta.mesesData
+      ? ([...meta.mesesData].reverse().find(m => (m.acumulado && m.acumulado.r !== null) || (m.pontual && m.pontual.na)) || meta.mesesData[11])
+      : null;
     const pontualP = lastData && lastData.pontual ? lastData.pontual.p : meta.valorAlvo;
     const pontualR = lastData && lastData.pontual ? lastData.pontual.r : meta.valorAtual;
     const acumP = lastData && lastData.acumulado ? lastData.acumulado.p : meta.valorAlvo;
@@ -1086,11 +1088,18 @@ const Metas = {
       if (m && m.mesesData) {
         let monthObj = m.mesesData.find(x => x.mes === mes);
         if (monthObj && monthObj[dataKey]) {
-          monthObj[dataKey].na = false;
-          if (field === 'r') monthObj[dataKey].r = null;
-          DataStore.recalcMesesData(m);
-          DataStore.update(DataStore.KEYS.METAS, m.id, m);
-          this.recalcParentMetas(metaId);
+          if (m.tipo === 'compartilhada' && m.refMetaId && field === 'r') {
+            // Espelho: propaga para a origem → origem propaga para todos os espelhos
+            this.syncResultToSource(m.refMetaId, mes, 'REMOVE_NA');
+          } else {
+            monthObj[dataKey].na = false;
+            if (field === 'r') monthObj[dataKey].r = null;
+            DataStore.recalcMesesData(m);
+            DataStore.update(DataStore.KEYS.METAS, m.id, m);
+            this.recalcParentMetas(metaId);
+            // Propaga para todos os espelhos desta origem
+            this.syncResultToMirrors(metaId, mes);
+          }
           Components.toast('N/A removido.', 'info');
           App.refreshPage();
           setTimeout(() => Metas.openDetail(metaId), 100);
@@ -1109,20 +1118,30 @@ const Metas = {
       let metas = DataStore.getMetas();
       let m = metas.find(x => x.id === metaId);
       if (!m) return;
-      if (!m.mesesData) m.mesesData = [];
-      let monthObj = m.mesesData.find(x => x.mes === mes);
-      if (!monthObj) {
-        monthObj = { mes, pontual: { p: null, r: null, d: null, nota: null, na: false }, acumulado: { p: null, r: null, d: null, nota: null }, anexos: [] };
-        m.mesesData.push(monthObj);
+
+      if (m.tipo === 'compartilhada' && m.refMetaId && field === 'r') {
+        // Espelho: propaga N/A para a origem → origem salva → origem propaga para TODOS os espelhos
+        this.syncResultToSource(m.refMetaId, mes, 'NA');
+      } else {
+        // Origem: salva diretamente e propaga para todos os espelhos
+        if (!m.mesesData) m.mesesData = [];
+        let monthObj = m.mesesData.find(x => x.mes === mes);
+        if (!monthObj) {
+          monthObj = { mes, pontual: { p: null, r: null, d: null, nota: null, na: false }, acumulado: { p: null, r: null, d: null, nota: null }, anexos: [] };
+          m.mesesData.push(monthObj);
+        }
+        if (!monthObj[dataKey]) monthObj[dataKey] = { p: null, r: null, d: null, nota: null, na: false };
+        if (field === 'r') {
+          monthObj[dataKey].r = null;
+          monthObj[dataKey].na = true;
+        }
+        DataStore.recalcMesesData(m);
+        DataStore.update(DataStore.KEYS.METAS, m.id, m);
+        this.recalcParentMetas(metaId);
+        // Propaga para todos os espelhos desta origem
+        this.syncResultToMirrors(metaId, mes);
       }
-      if (!monthObj[dataKey]) monthObj[dataKey] = { p: null, r: null, d: null, nota: null, na: false };
-      if (field === 'r') {
-        monthObj[dataKey].r = null;
-        monthObj[dataKey].na = true;
-      }
-      DataStore.recalcMesesData(m);
-      DataStore.update(DataStore.KEYS.METAS, m.id, m);
-      this.recalcParentMetas(metaId);
+
       Components.toast('Apontamento salvo como N/A.', 'success');
       App.refreshPage();
       setTimeout(() => Metas.openDetail(metaId), 100);
@@ -1154,9 +1173,12 @@ const Metas = {
     DataStore.update(DataStore.KEYS.METAS, m.id, m);
     this.recalcParentMetas(metaId);
 
-    // Sincronizar se for compartilhada
+    // Sincronizar se for compartilhada: propaga para origem → origem propaga para todos os espelhos
     if (m.tipo === 'compartilhada' && m.refMetaId && field === 'r') {
        this.syncResultToSource(m.refMetaId, mes, valueStr);
+    } else if (field === 'r') {
+      // Origem: propaga resultado para todos os espelhos
+      this.syncResultToMirrors(metaId, mes);
     }
 
     Components.toast('Valor salvo com sucesso.', 'success');
@@ -1181,10 +1203,13 @@ const Metas = {
      const sourceIdx = metas.findIndex(x => String(x.id) === String(sourceId));
      if (sourceIdx !== -1) {
         const m = metas[sourceIdx];
-        const monthObj = m.mesesData.find(d => d.mes === mes);
+        const monthObj = m.mesesData ? m.mesesData.find(d => d.mes === mes) : null;
         if (monthObj) {
            if (valueStr === null || valueStr === 'NA') {
               monthObj.pontual.na = true;
+              monthObj.pontual.r = null;
+           } else if (valueStr === 'REMOVE_NA') {
+              monthObj.pontual.na = false;
               monthObj.pontual.r = null;
            } else {
               monthObj.pontual.r = parseFloat(String(valueStr).replace(',', '.'));
@@ -1192,10 +1217,24 @@ const Metas = {
            }
            DataStore.recalcMesesData(m);
            DataStore.update(DataStore.KEYS.METAS, m.id, m);
-           // Se a origem for filha de outra composta, recalcula a hierarquia
+           // Recalcula hierarquia de metas compostas
            this.recalcParentMetas(sourceId);
+           // Propaga o dado atualizado da origem para TODOS os espelhos
+           this.syncResultToMirrors(sourceId, mes);
         }
      }
+  },
+
+  syncResultToMirrors(sourceId, mes) {
+     // Encontra todos os espelhos que referenciam esta origem
+     let metas = DataStore.getMetas();
+     const mirrors = metas.filter(x => x.tipo === 'compartilhada' && String(x.refMetaId) === String(sourceId));
+     mirrors.forEach(mirror => {
+        if (!mirror.mesesData) return;
+        // recalcMesesData para espelhos copia automaticamente todos os dados da origem
+        DataStore.recalcMesesData(mirror);
+        DataStore.update(DataStore.KEYS.METAS, mirror.id, mirror);
+     });
   },
 
   openAnexoForm(metaId, mes) {
