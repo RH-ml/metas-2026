@@ -1227,7 +1227,6 @@ const Metas = {
            this.recalcParentMetas(sourceId);
            // Propaga o dado atualizado da origem para TODOS os espelhos
            this.syncResultToMirrors(sourceId, mes);
-        }
      }
   },
 
