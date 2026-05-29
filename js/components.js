@@ -70,6 +70,10 @@ const Components = {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input type="text" placeholder="Buscar... (Enter)" class="search-input" id="globalSearch" value="${(typeof Metas !== 'undefined' && Metas.currentSearch) ? Metas.currentSearch : ''}" onchange="if(typeof Metas !== 'undefined') { Metas.currentSearch = this.value; App.refreshPage(); }" onkeyup="if(event.key === 'Enter') { this.blur(); }">
           </div>` : ''}
+          <button id="btn-force-sync" title="Sincronizar dados com a nuvem agora" onclick="DataStore.forceSyncFromFirebase()" style="background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.3);color:#22c55e;border-radius:8px;padding:6px 10px;cursor:pointer;display:flex;align-items:center;gap:6px;font-size:0.78rem;font-weight:600;transition:all 0.2s;" onmouseover="this.style.background='rgba(34,197,94,0.22)'" onmouseout="this.style.background='rgba(34,197,94,0.12)'">
+            <svg id="sync-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+            Sincronizar
+          </button>
           <div class="header-profile">
             <div class="avatar">${avatar}</div>
             <span class="profile-name">${userName}</span>

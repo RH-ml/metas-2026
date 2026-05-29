@@ -149,14 +149,16 @@ const DataStore = {
     metas.filter(m => m.tipo !== 'composta').forEach(m => {
       if (m.mesesData) this.recalcMesesData(m);
     });
-    this.set(this.KEYS.METAS, metas);
+    // IMPORTANTE: usa localStorage diretamente para NÃO sobrescrever o Firebase.
+    // O Firebase é sempre a fonte da verdade — a migração só corrige o cache local.
+    localStorage.setItem(this.KEYS.METAS, JSON.stringify(metas));
 
     // Passo 2: Recalcula as metas Compostas (que agora lerão as notas corrigidas das filhas do banco)
     metas = this.getMetas();
     metas.filter(m => m.tipo === 'composta').forEach(m => {
       if (m.mesesData) this.recalcMesesData(m);
     });
-    this.set(this.KEYS.METAS, metas);
+    localStorage.setItem(this.KEYS.METAS, JSON.stringify(metas));
   },
 
   // =====================================================================
@@ -249,6 +251,57 @@ const DataStore = {
     // Toast discreto informando que os dados foram atualizados por outro usuário
     if (typeof Components !== 'undefined' && Components.toast) {
       Components.toast('🔄 Dados atualizados por outro usuário.', 'info', 2500);
+    }
+  },
+
+  // Sincronização forçada: puxar TUDO do Firebase agora, sem anti-amnésia.
+  // Firebase é sempre a fonte da verdade neste caso.
+  async forceSyncFromFirebase() {
+    if (!isFirebaseActive || !db) {
+      Components.toast('⚠️ Firebase inativo — rodando em modo local.', 'error');
+      return;
+    }
+
+    // Animação no botão
+    const btn = document.getElementById('btn-force-sync');
+    const icon = document.getElementById('sync-icon');
+    if (btn) btn.disabled = true;
+    if (icon) icon.style.animation = 'spin 0.8s linear infinite';
+
+    // Injeta keyframe de rotação se necessário
+    if (!document.getElementById('sync-keyframes')) {
+      const style = document.createElement('style');
+      style.id = 'sync-keyframes';
+      style.textContent = '@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }';
+      document.head.appendChild(style);
+    }
+
+    try {
+      const syncKeys = Object.values(this.KEYS).filter(k => k !== this.KEYS.SESSION);
+
+      for (const key of syncKeys) {
+        const snapshot = await db.collection(key).get();
+        if (snapshot.empty) continue;
+
+        const fbList = [];
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          if (data && data.id && !this._isDeleted(data.id)) fbList.push(data);
+        });
+
+        if (fbList.length > 0) {
+          localStorage.setItem(key, JSON.stringify(fbList));
+        }
+      }
+
+      Components.toast('✅ Dados sincronizados com sucesso!', 'success');
+      App.refreshPage();
+    } catch (err) {
+      console.error('Erro na sincronização forçada:', err);
+      Components.toast('❌ Falha ao sincronizar. Verifique a conexão.', 'error');
+    } finally {
+      if (btn) btn.disabled = false;
+      if (icon) icon.style.animation = '';
     }
   },
 
