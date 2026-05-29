@@ -51,19 +51,23 @@ const DataStore = {
             const localMap = {};
             localList.forEach(item => { if (item.id) localMap[item.id] = item; });
 
-            // Para cada item do Firebase, verificar se o local é mais novo
+            // Para cada item do Firebase, verificar se o local é significativamente mais novo.
+            // MARGEM DE 5 SEGUNDOS: evita que caches locais levemente desatualizados (por
+            // diferença de relógio, migração ou recálculo automático) sobrescrevam dados válidos
+            // do Firebase quando múltiplos usuários estão ativos simultaneamente.
             const mergedList = fbList.map(fbItem => {
               const localItem = localMap[fbItem.id];
               if (!localItem) return fbItem;
               const fbTime = fbItem.atualizadoEm ? new Date(fbItem.atualizadoEm).getTime() : 0;
               const localTime = localItem.atualizadoEm ? new Date(localItem.atualizadoEm).getTime() : 0;
-              if (localTime > fbTime) {
+              const MARGIN_MS = 5000; // Local só ganha se for >5s mais novo (edição genuína do usuário)
+              if (localTime > fbTime + MARGIN_MS) {
                 console.log(`⚡ Merge: item local mais novo para ${key}/${fbItem.id} — preservando edição local e curando a nuvem.`);
                 // Push para o Firebase para curar a nuvem (sincronização bidirecional)
                 db.collection(key).doc(localItem.id).set(JSON.parse(JSON.stringify(localItem))).catch(console.error);
-                return localItem; // Local ganhou: tem dados mais recentes
+                return localItem; // Local ganhou: tem dados genuinamente mais recentes
               }
-              return fbItem; // Firebase ganhou: tem dados mais recentes ou iguais
+              return fbItem; // Firebase ganhou: fonte da verdade para edições concorrentes
             });
 
             // Incluir itens locais que não existem no Firebase (segurança)
@@ -132,6 +136,9 @@ const DataStore = {
       localStorage.setItem(MIGRATION_KEY, new Date().toISOString());
       console.log('✅ Migração v5 concluída.');
     }
+
+    // Inicia sincronização em tempo real para manter todos os usuários sincronizados
+    this.startRealtimeSync();
   },
 
   globalRecalcMetas() {
@@ -150,6 +157,99 @@ const DataStore = {
       if (m.mesesData) this.recalcMesesData(m);
     });
     this.set(this.KEYS.METAS, metas);
+  },
+
+  // =====================================================================
+  // SINCRONIZAÇÃO EM TEMPO REAL (onSnapshot)
+  // Mantém todos os usuários sincronizados sem precisar recarregar a página.
+  // A origem da verdade é sempre o Firebase Firestore.
+  // =====================================================================
+  startRealtimeSync() {
+    if (!isFirebaseActive || !db) return;
+    if (this._realtimeSyncing) return; // Previne configuração dupla
+    this._realtimeSyncing = true;
+
+    // Aguarda 2s para que a página termine de renderizar antes de ativar os listeners.
+    // O init() já fez a sincronização inicial, então o primeiro onSnapshot é ignorado.
+    setTimeout(() => {
+      const syncKeys = [
+        this.KEYS.METAS,
+        this.KEYS.ACOES,
+        this.KEYS.USERS,
+        this.KEYS.AREAS,
+        this.KEYS.HISTORICO_AREAS
+      ];
+
+      syncKeys.forEach(key => {
+        let isFirstSnapshot = true;
+
+        db.collection(key).onSnapshot(snapshot => {
+          // O primeiro disparo do onSnapshot é o estado atual (já sincronizado no init)
+          // Ignoramos para evitar re-render desnecessário na inicialização
+          if (isFirstSnapshot) {
+            isFirstSnapshot = false;
+            return;
+          }
+
+          if (!snapshot || snapshot.empty) return;
+
+          const fbList = [];
+          snapshot.forEach(doc => {
+            const data = doc.data();
+            if (data && data.id && !this._isDeleted(data.id)) {
+              fbList.push(data);
+            }
+          });
+
+          if (fbList.length === 0) return;
+
+          // Verificar se os dados realmente mudaram antes de atualizar
+          const currentStr = localStorage.getItem(key) || '[]';
+          const newStr = JSON.stringify(fbList);
+          if (newStr === currentStr) return;
+
+          // Atualiza o localStorage com os dados mais recentes do Firebase
+          localStorage.setItem(key, newStr);
+          console.log(`🔄 Dados atualizados em tempo real: ${key}`);
+
+          // Atualiza a UI somente se o usuário não estiver editando (modal fechado)
+          const isModalOpen = !!document.querySelector('.modal-overlay');
+          if (!isModalOpen && typeof App !== 'undefined' && App.currentRoute && App.currentRoute !== 'login') {
+            clearTimeout(this._refreshDebounce);
+            this._refreshDebounce = setTimeout(() => {
+              // Dupla verificação: não interrompe se modal abriu enquanto aguardava
+              if (!document.querySelector('.modal-overlay')) {
+                this._showSyncNotification();
+                App.refreshPage();
+              }
+            }, 600);
+          } else if (isModalOpen) {
+            // Modal aberto: marca que há dados pendentes para atualizar ao fechar
+            this._hasPendingSync = true;
+          }
+        }, error => {
+          console.error(`[Sync em tempo real] Erro na coleção ${key}:`, error);
+        });
+      });
+
+      // Observa fechamento de modal para aplicar sync pendente
+      document.addEventListener('click', (e) => {
+        if (this._hasPendingSync && !document.querySelector('.modal-overlay')) {
+          this._hasPendingSync = false;
+          this._showSyncNotification();
+          if (typeof App !== 'undefined') App.refreshPage();
+        }
+      }, true);
+
+      console.log('🟢 Sincronização em tempo real ativada. Todos os usuários estão conectados.');
+    }, 2000);
+  },
+
+  _showSyncNotification() {
+    // Toast discreto informando que os dados foram atualizados por outro usuário
+    if (typeof Components !== 'undefined' && Components.toast) {
+      Components.toast('🔄 Dados atualizados por outro usuário.', 'info', 2500);
+    }
   },
 
   async seedFirebaseDatabase() {
