@@ -137,6 +137,38 @@ const DataStore = {
       console.log('✅ Migração v5 concluída.');
     }
 
+    // Migração v6: Atualizar todos os meses já salvos na base de '/25' para '/26'
+    const MIGRATION_KEY_V6 = 'mp_migration_year_v6';
+    if (!localStorage.getItem(MIGRATION_KEY_V6)) {
+      console.log('🔧 Executando migração de dados v6 — atualizando ano de /25 para /26...');
+      let metas = this.get(this.KEYS.METAS) || [];
+      let updatedAny = false;
+      metas.forEach(m => {
+        let changed = false;
+        if (m.mesesData && Array.isArray(m.mesesData)) {
+          m.mesesData.forEach(monthObj => {
+            if (monthObj.mes && monthObj.mes.includes('/25')) {
+              monthObj.mes = monthObj.mes.replace('/25', '/26');
+              changed = true;
+            }
+          });
+        }
+        if (changed) {
+          updatedAny = true;
+          // Puxa o item inteiro atualizado e joga pro Firebase individualmente para evitar concorrência
+          if (isFirebaseActive && db) {
+            const cleanItem = JSON.parse(JSON.stringify(m));
+            db.collection(this.KEYS.METAS).doc(m.id).set(cleanItem).catch(e => console.error(e));
+          }
+        }
+      });
+      if (updatedAny) {
+        localStorage.setItem(this.KEYS.METAS, JSON.stringify(metas));
+        console.log('✅ Dados atualizados com sucesso para 2026!');
+      }
+      localStorage.setItem(MIGRATION_KEY_V6, new Date().toISOString());
+    }
+
     // Inicia sincronização em tempo real para manter todos os usuários sincronizados
     this.startRealtimeSync();
   },
