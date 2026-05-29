@@ -174,6 +174,28 @@ const DataStore = {
       }
     }
 
+    // Migração v7: Varredura agressiva final para '/25' (garante que quem pulou a v6 seja corrigido)
+    const MIGRATION_KEY_V7 = 'mp_migration_year_v7_force';
+    if (!localStorage.getItem(MIGRATION_KEY_V7)) {
+      let metas = this.get(this.KEYS.METAS) || [];
+      let updatedAny = false;
+      metas.forEach(m => {
+        if (m.mesesData && Array.isArray(m.mesesData)) {
+          m.mesesData.forEach(monthObj => {
+            if (monthObj.mes && monthObj.mes.includes('/25')) {
+              monthObj.mes = monthObj.mes.replace('/25', '/26');
+              updatedAny = true;
+            }
+          });
+        }
+      });
+      if (updatedAny) {
+        localStorage.setItem(this.KEYS.METAS, JSON.stringify(metas));
+        setTimeout(() => window.location.reload(true), 1500);
+      }
+      localStorage.setItem(MIGRATION_KEY_V7, new Date().toISOString());
+    }
+
     // Inicia sincronização em tempo real para manter todos os usuários sincronizados
     this.startRealtimeSync();
   },
@@ -320,7 +342,22 @@ const DataStore = {
 
       for (const key of syncKeys) {
         const snapshot = await db.collection(key).get();
-        if (snapshot.empty) continue;
+        if (snapshot.empty) {
+          // Se o Firebase estiver vazio, fazemos o upload da base local para inicializá-lo!
+          const localData = this.get(key) || [];
+          if (localData.length > 0) {
+            console.warn(`Coleção ${key} vazia na nuvem. Enviando dados locais para o Firebase...`);
+            localData.forEach(item => {
+              if (item && item.id) {
+                db.collection(key).doc(item.id).set(item).catch(e => {
+                  console.error('Erro ao semear Firebase:', e);
+                  if (typeof Components !== 'undefined' && Components.toast) Components.toast('❌ Erro de permissão no Firebase.', 'error');
+                });
+              }
+            });
+          }
+          continue;
+        }
 
         const fbList = [];
         snapshot.forEach(doc => {
@@ -440,7 +477,12 @@ const DataStore = {
     if (isFirebaseActive && db && key !== this.KEYS.SESSION) {
       const cleanItem = JSON.parse(JSON.stringify(item));
       db.collection(key).doc(item.id).set(cleanItem)
-        .catch(e => console.error(`Erro ao adicionar registro no Firebase para ${key}:`, e));
+        .catch(e => {
+          console.error(`Erro ao adicionar registro no Firebase para ${key}:`, e);
+          if (typeof Components !== 'undefined' && Components.toast) {
+            Components.toast('❌ Erro de permissão. O Firebase bloqueou o salvamento. Verifique as regras (Rules) do Firestore.', 'error');
+          }
+        });
     }
     return item;
   },
@@ -458,7 +500,12 @@ const DataStore = {
       if (isFirebaseActive && db && key !== this.KEYS.SESSION) {
         const cleanItem = JSON.parse(JSON.stringify(data[idx]));
         db.collection(key).doc(id).set(cleanItem)
-          .catch(e => console.error(`Erro ao atualizar registro no Firebase para ${key}:`, e));
+          .catch(e => {
+            console.error(`Erro ao atualizar registro no Firebase para ${key}:`, e);
+            if (typeof Components !== 'undefined' && Components.toast) {
+              Components.toast('❌ Erro de permissão. O Firebase bloqueou o salvamento. Verifique as regras (Rules) do Firestore.', 'error');
+            }
+          });
       }
     }
     return data[idx];
