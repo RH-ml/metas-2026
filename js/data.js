@@ -171,8 +171,8 @@ const DataStore = {
     if (this._realtimeSyncing) return; // Previne configuração dupla
     this._realtimeSyncing = true;
 
-    // Aguarda 2s para que a página termine de renderizar antes de ativar os listeners.
-    // O init() já fez a sincronização inicial, então o primeiro onSnapshot é ignorado.
+    // Aguarda 500ms para que a página termine de renderizar antes de ativar os listeners.
+    // Delay reduzido de 2s para minimizar a janela em que mudanças podem ser perdidas.
     setTimeout(() => {
       const syncKeys = [
         this.KEYS.METAS,
@@ -221,6 +221,7 @@ const DataStore = {
             this._refreshDebounce = setTimeout(() => {
               // Dupla verificação: não interrompe se modal abriu enquanto aguardava
               if (!document.querySelector('.modal-overlay')) {
+                this.globalRecalcMetas();
                 this._showSyncNotification();
                 App.refreshPage();
               }
@@ -238,6 +239,7 @@ const DataStore = {
       document.addEventListener('click', (e) => {
         if (this._hasPendingSync && !document.querySelector('.modal-overlay')) {
           this._hasPendingSync = false;
+          this.globalRecalcMetas();
           this._showSyncNotification();
           if (typeof App !== 'undefined') App.refreshPage();
         }
@@ -294,6 +296,7 @@ const DataStore = {
         }
       }
 
+      this.globalRecalcMetas();
       Components.toast('✅ Dados sincronizados com sucesso!', 'success');
       App.refreshPage();
     } catch (err) {
@@ -392,10 +395,11 @@ const DataStore = {
     const data = this.get(key);
     item.id = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
     item.criadoEm = new Date().toISOString();
+    item.atualizadoEm = item.criadoEm;
     data.push(item);
-    this.set(key, data);
+    // Grava apenas no localStorage localmente; Firebase recebe só o documento novo
+    localStorage.setItem(key, JSON.stringify(data));
 
-    // Sincronização em background no Firebase
     if (isFirebaseActive && db && key !== this.KEYS.SESSION) {
       const cleanItem = JSON.parse(JSON.stringify(item));
       db.collection(key).doc(item.id).set(cleanItem)
@@ -409,9 +413,11 @@ const DataStore = {
     const idx = data.findIndex(i => i.id === id);
     if (idx !== -1) { 
       data[idx] = { ...data[idx], ...updates, atualizadoEm: new Date().toISOString() }; 
-      this.set(key, data);
+      // Grava apenas no localStorage — NÃO faz batch de todos os itens no Firebase.
+      // O Firebase recebe somente o documento modificado, evitando race conditions
+      // entre usuários que estejam salvando simultaneamente.
+      localStorage.setItem(key, JSON.stringify(data));
       
-      // Sincronização em background no Firebase
       if (isFirebaseActive && db && key !== this.KEYS.SESSION) {
         const cleanItem = JSON.parse(JSON.stringify(data[idx]));
         db.collection(key).doc(id).set(cleanItem)
@@ -422,13 +428,14 @@ const DataStore = {
   },
  
   remove(key, id) {
-    // 1. Registrar como excluído (tombstone) ANTES de qualquer operação para garantir persistência
+    // 1. Registrar como excluído (tombstone) ANTES de qualquer operação
     this._registerDeleted(id);
     
     const data = this.get(key).filter(i => i.id !== id);
-    this.set(key, data);
+    // Atualiza localStorage sem batch no Firebase (delete individual abaixo)
+    localStorage.setItem(key, JSON.stringify(data));
 
-    // 2. Sincronização com Firebase — aguarda confirmação e re-tenta em caso de falha
+    // 2. Exclui o documento individual do Firebase
     if (isFirebaseActive && db && key !== this.KEYS.SESSION) {
       const attemptDelete = (retries = 3) => {
         db.collection(key).doc(id).delete()
@@ -521,7 +528,7 @@ const DataStore = {
   getUserById(id) { return this.getById(this.KEYS.USERS, id); },
   getMetas() {
     const metas = this.get(this.KEYS.METAS) || [];
-    const mesesNomes = ['Jan/25','Fev/25','Mar/25','Abr/25','Mai/25','Jun/25','Jul/25','Ago/25','Set/25','Out/25','Nov/25','Dez/25'];
+    const mesesNomes = ['Jan/26','Fev/26','Mar/26','Abr/26','Mai/26','Jun/26','Jul/26','Ago/26','Set/26','Out/26','Nov/26','Dez/26'];
     
     // Processamento leve em memória, sem salvar de volta no localStorage aqui
     return metas.map((m, index) => {

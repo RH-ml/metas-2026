@@ -138,7 +138,7 @@ const Metas = {
         </td>
         <td style="text-align: center; font-size: 0.75rem; color: var(--text-3);">
           <div style="background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 4px;">
-            ${lastData ? lastData.mes.toUpperCase() : 'DEZ/25'}
+            ${lastData ? lastData.mes.toUpperCase() : 'DEZ/26'}
           </div>
         </td>
       </tr>`;
@@ -1016,6 +1016,7 @@ const Metas = {
       }
       DataStore.update(DataStore.KEYS.METAS, editId, data);
       this.recalcParentMetas(editId); 
+      this.syncResultToMirrors(editId); // Push curve and target value updates to all mirrors in Firebase
       Components.toast('Meta atualizada com sucesso!', 'success');
     } else {
       data.valorAtual = 0;
