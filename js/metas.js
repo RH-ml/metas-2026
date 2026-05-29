@@ -1204,11 +1204,16 @@ const Metas = {
      const sourceIdx = metas.findIndex(x => String(x.id) === String(sourceId));
      if (sourceIdx !== -1) {
         const m = metas[sourceIdx];
-        const monthObj = m.mesesData ? m.mesesData.find(d => d.mes === mes) : null;
-        if (monthObj) {
-           if (valueStr === null || valueStr === 'NA') {
-              monthObj.pontual.na = true;
-              monthObj.pontual.r = null;
+        let monthObj = m.mesesData ? m.mesesData.find(d => d.mes === mes) : null;
+        if (!monthObj) {
+           if (!m.mesesData) m.mesesData = [];
+           monthObj = { mes, pontual: { p: null, r: null, d: null, nota: null, na: false }, acumulado: { p: null, r: null, d: null, nota: null }, anexos: [] };
+           m.mesesData.push(monthObj);
+        }
+        
+        if (valueStr === null || valueStr === 'NA') {
+           monthObj.pontual.na = true;
+           monthObj.pontual.r = null;
            } else if (valueStr === 'REMOVE_NA') {
               monthObj.pontual.na = false;
               monthObj.pontual.r = null;

@@ -167,6 +167,11 @@ const DataStore = {
         console.log('✅ Dados atualizados com sucesso para 2026!');
       }
       localStorage.setItem(MIGRATION_KEY_V6, new Date().toISOString());
+      
+      // Força um recarregamento total da página para garantir que o cache de scripts antigos seja ignorado
+      if (updatedAny) {
+        setTimeout(() => window.location.reload(true), 1500);
+      }
     }
 
     // Inicia sincronização em tempo real para manter todos os usuários sincronizados
