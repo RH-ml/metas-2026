@@ -167,37 +167,31 @@ const Metas = {
     }
 
     let metas = DataStore.getMetas();
-    
-    // Se houver área selecionada, filtra por EXATO, mas inclui metas compartilhadas
-    // onde o corresponsável pertença a esta área.
-    let areaMetas = [];
+    let areaMetas = metas;
     const isSearching = this.currentSearch && this.currentSearch.trim() !== '';
 
-    if (isSearching) {
-      if (isAdmin || isDiretoria) {
-        areaMetas = metas;
-      } else {
-        const authorizedIds = DataStore.getAuthorizedAreas().map(a => a.id);
-        areaMetas = metas.filter(m => {
-          if (m.tipo === 'compartilhada' && Array.isArray(m.coresponsavelIds)) {
-            return m.coresponsavelIds.some(uid => {
-              const uArea = DataStore.getAreaAtual(uid);
-              return uArea && authorizedIds.includes(uArea.id);
-            });
-          }
-          if (m.responsavelId) {
-            const respArea = DataStore.getAreaAtual(m.responsavelId);
-            if (respArea) return authorizedIds.includes(respArea.id);
-            return authorizedIds.includes(m.areaId);
-          }
+    // 1. Filtro de Autorização (se não for admin/diretoria)
+    if (!isAdmin && !isDiretoria) {
+      const authorizedIds = DataStore.getAuthorizedAreas().map(a => a.id);
+      areaMetas = areaMetas.filter(m => {
+        if (m.tipo === 'compartilhada' && Array.isArray(m.coresponsavelIds)) {
+          return m.coresponsavelIds.some(uid => {
+            const uArea = DataStore.getAreaAtual(uid);
+            return uArea && authorizedIds.includes(uArea.id);
+          });
+        }
+        if (m.responsavelId) {
+          const respArea = DataStore.getAreaAtual(m.responsavelId);
+          if (respArea) return authorizedIds.includes(respArea.id);
           return authorizedIds.includes(m.areaId);
-        });
-      }
-    } else if (this.currentArea && this.currentArea !== 'todas' && this.currentArea !== 'all') {
-      areaMetas = metas.filter(m => {
-        // Se for meta compartilhada, ela SÓ aparece na área EXATA do correspónsavel.
-        // NÃO aparece na área do responsável original (onde já existe a meta-mãe),
-        // nem em áreas pai (ex: Diretoria) — apenas na área de responsabilidade direta.
+        }
+        return authorizedIds.includes(m.areaId);
+      });
+    }
+
+    // 2. Filtro de Área Selecionada (this.currentArea)
+    if (this.currentArea && this.currentArea !== 'todas' && this.currentArea !== 'all') {
+      areaMetas = areaMetas.filter(m => {
         if (m.tipo === 'compartilhada') {
           if (Array.isArray(m.coresponsavelIds) && m.coresponsavelIds.length > 0) {
             return m.coresponsavelIds.some(uid => {
@@ -207,40 +201,34 @@ const Metas = {
           }
           return false;
         }
-        // Para metas normais: a área ATUAL do responsável é a fonte autoritativa.
-        // Se getAreaAtual retornar uma área, esse resultado é FINAL (não cai no fallback).
-        // O fallback de areaId só é usado quando o responsável não tem histórico de área.
         if (m.responsavelId) {
           const respArea = DataStore.getAreaAtual(m.responsavelId);
           if (respArea) {
-            // Encontrou a área atual → resultado definitivo, sem fallback
             return respArea.id === this.currentArea;
           }
-          // Sem historico_areas: usa areaId salvo na meta como último recurso
           return m.areaId === this.currentArea;
         }
-        // Meta sem responsável: usa areaId salvo
         return m.areaId === this.currentArea;
       });
-    } else if (this.currentArea === 'todas' || this.currentArea === 'all') {
-      areaMetas = metas;
-    } else {
-      areaMetas = [];
     }
-    
-    // Apply additional filters (search, status)
+
+    // 3. Filtro de Busca e Regra de Ouro (compartilhadas)
     let filtered = areaMetas.filter(m => {
       // Regra de Ouro: Metas compartilhadas (espelhos) só aparecem no painel individual do responsável.
       if (m.tipo === 'compartilhada' && (this.currentArea === 'todas' || this.currentArea === 'all')) {
         return false;
       }
-      const s = this.currentSearch.toLowerCase();
-      const responsavel = m.responsavelId ? DataStore.getUserById(m.responsavelId) : null;
-      const respNome = responsavel ? responsavel.nome.toLowerCase() : '';
-      const matchSearch = (m.titulo || '').toLowerCase().includes(s) || 
-                          (m.codigo || '').toLowerCase().includes(s) ||
-                          respNome.includes(s);
-      return matchSearch;
+      
+      if (isSearching) {
+        const s = this.currentSearch.toLowerCase();
+        const responsavel = m.responsavelId ? DataStore.getUserById(m.responsavelId) : null;
+        const respNome = responsavel ? responsavel.nome.toLowerCase() : '';
+        const matchSearch = (m.titulo || '').toLowerCase().includes(s) || 
+                            (m.codigo || '').toLowerCase().includes(s) ||
+                            respNome.includes(s);
+        return matchSearch;
+      }
+      return true;
     });
     metas = filtered;
     

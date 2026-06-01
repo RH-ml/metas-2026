@@ -53,7 +53,8 @@ const Components = {
     }
     const userName = session.nome || 'Usuário';
     const avatar = session.avatar || 'U';
-    return `
+    
+    const html = `
       <header class="main-header">
         <div class="header-left">
           <button class="sidebar-toggle" id="sidebarToggle" onclick="Components.toggleSidebar()">
@@ -80,6 +81,65 @@ const Components = {
           </div>
         </div>
       </header>`;
+    
+    // Injeta o diagnóstico de conexão no topo
+    setTimeout(() => this.runFirebaseDiagnostics(), 2000);
+
+    return html;
+  },
+
+  runFirebaseDiagnostics() {
+    if (document.getElementById('firebase-diagnostic-banner')) return;
+    
+    const banner = document.createElement('div');
+    banner.id = 'firebase-diagnostic-banner';
+    banner.style.padding = '10px';
+    banner.style.textAlign = 'center';
+    banner.style.fontWeight = 'bold';
+    banner.style.color = '#fff';
+    banner.style.zIndex = '99999';
+    banner.style.position = 'fixed';
+    banner.style.bottom = '0';
+    banner.style.left = '0';
+    banner.style.width = '100%';
+    banner.style.boxShadow = '0 -2px 10px rgba(0,0,0,0.2)';
+    
+    document.body.appendChild(banner);
+
+    if (typeof db === 'undefined' || !db) {
+      banner.style.backgroundColor = '#dc3545'; // Red
+      banner.innerHTML = `❌ FIREBASE OFFLINE - Banco de dados não inicializado. (Versão do Código: ${this.VERSION})`;
+      return;
+    }
+
+    banner.style.backgroundColor = '#fd7e14'; // Orange
+    banner.innerHTML = `⏳ TESTANDO CONEXÃO COM A NUVEM... (Versão: ${this.VERSION})`;
+
+    // Testa Leitura
+    db.collection('mp_metas').limit(1).get()
+      .then(snap => {
+        const isVazio = snap.empty;
+        // Testa Escrita Num Documento Temporário
+        const testId = 'TEST_PERM_' + Date.now();
+        db.collection('mp_metas').doc(testId).set({ _test: true })
+          .then(() => {
+            // Sucesso na escrita! Limpa o teste.
+            db.collection('mp_metas').doc(testId).delete().catch(()=>{});
+            banner.style.backgroundColor = '#28a745'; // Green
+            banner.innerHTML = `✅ NUVEM CONECTADA PERFEITAMENTE ${isVazio ? '(ATENÇÃO: NUVEM ESTÁ VAZIA!)' : ''} - (Versão: ${this.VERSION})`;
+            setTimeout(() => banner.remove(), 5000);
+          })
+          .catch(err => {
+            console.error('Erro de permissão de escrita:', err);
+            banner.style.backgroundColor = '#dc3545'; // Red
+            banner.innerHTML = `❌ ERRO GRAVE DE PERMISSÃO: O Firebase está BLOQUEANDO o salvamento! Verifique as regras (Rules) no console do Firebase. Ninguém consegue salvar na nuvem! (Versão: ${this.VERSION})`;
+          });
+      })
+      .catch(err => {
+        console.error('Erro de permissão de leitura:', err);
+        banner.style.backgroundColor = '#dc3545'; // Red
+        banner.innerHTML = `❌ ERRO GRAVE DE PERMISSÃO: O Firebase está BLOQUEANDO a leitura! Verifique as regras (Rules). (Versão: ${this.VERSION})`;
+      });
   },
 
   toggleSidebar() {
