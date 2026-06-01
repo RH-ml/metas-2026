@@ -192,29 +192,29 @@ const Metas = {
     // 2. Filtro de Área Selecionada (this.currentArea)
     if (this.currentArea && this.currentArea !== 'todas' && this.currentArea !== 'all') {
       areaMetas = areaMetas.filter(m => {
-        if (m.tipo === 'compartilhada') {
-          if (Array.isArray(m.coresponsavelIds) && m.coresponsavelIds.length > 0) {
-            return m.coresponsavelIds.some(uid => {
-              const uArea = DataStore.getAreaAtual(uid);
-              return (uArea && uArea.id === this.currentArea) || m.areaId === this.currentArea;
-            });
-          }
-          return false;
+        // Para metas compartilhadas COM corresponsáveis: verificar se algum corresponsável pertence a esta área
+        if (m.tipo === 'compartilhada' && Array.isArray(m.coresponsavelIds) && m.coresponsavelIds.length > 0) {
+          const corespMatch = m.coresponsavelIds.some(uid => {
+            const uArea = DataStore.getAreaAtual(uid);
+            return uArea && uArea.id === this.currentArea;
+          });
+          if (corespMatch) return true;
+          // Continua para verificar areaId e responsavelId abaixo
         }
-        
-        // Se a meta está explicitamente atrelada a esta área (via cadastro)
+
+        // Para todos os tipos: verificar areaId salvo na meta
         if (m.areaId === this.currentArea) {
           return true;
         }
-        
-        // Ou se o responsável atual pertence a esta área
+
+        // Verificar área atual do responsável
         if (m.responsavelId) {
           const respArea = DataStore.getAreaAtual(m.responsavelId);
           if (respArea && respArea.id === this.currentArea) {
             return true;
           }
         }
-        
+
         return false;
       });
     }
