@@ -202,7 +202,7 @@ const Metas = {
           return false;
         }
         
-        // Se a meta está explicitamente atrelada a esta área (via cadastro/relatório)
+        // Se a meta está explicitamente atrelada a esta área (via cadastro)
         if (m.areaId === this.currentArea) {
           return true;
         }
