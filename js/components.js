@@ -82,8 +82,8 @@ const Components = {
         </div>
       </header>`;
     
-    // Injeta o diagnóstico de conexão no topo
-    setTimeout(() => this.runFirebaseDiagnostics(), 2000);
+    // Diagnóstico removido a pedido do usuário
+    // setTimeout(() => this.runFirebaseDiagnostics(), 2000);
 
     return html;
   },

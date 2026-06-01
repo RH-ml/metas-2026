@@ -196,19 +196,26 @@ const Metas = {
           if (Array.isArray(m.coresponsavelIds) && m.coresponsavelIds.length > 0) {
             return m.coresponsavelIds.some(uid => {
               const uArea = DataStore.getAreaAtual(uid);
-              return uArea && uArea.id === this.currentArea;
+              return (uArea && uArea.id === this.currentArea) || m.areaId === this.currentArea;
             });
           }
           return false;
         }
+        
+        // Se a meta está explicitamente atrelada a esta área (via cadastro/relatório)
+        if (m.areaId === this.currentArea) {
+          return true;
+        }
+        
+        // Ou se o responsável atual pertence a esta área
         if (m.responsavelId) {
           const respArea = DataStore.getAreaAtual(m.responsavelId);
-          if (respArea) {
-            return respArea.id === this.currentArea;
+          if (respArea && respArea.id === this.currentArea) {
+            return true;
           }
-          return m.areaId === this.currentArea;
         }
-        return m.areaId === this.currentArea;
+        
+        return false;
       });
     }
 
