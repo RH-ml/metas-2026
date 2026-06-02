@@ -44,8 +44,19 @@ const DataStore = {
           for (const key of Object.values(this.KEYS)) {
             if (key === this.KEYS.SESSION) continue; // Sessão é puramente local
             const snapshot = await db.collection(key).get();
+
+            // CORREÇÃO: Filtrar tombstones do fbList ANTES de qualquer merge.
+            // Isso garante que itens excluídos no Firebase ainda não propagados
+            // (race condition) não entrem na lista de merge.
             const fbList = [];
-            snapshot.forEach(doc => fbList.push(doc.data()));
+            snapshot.forEach(doc => {
+              const data = doc.data();
+              if (data && data.id && !this._isDeleted(data.id)) fbList.push(data);
+              // Se o item está nos tombstones mas ainda existe no Firebase, re-exclui
+              else if (data && data.id && this._isDeleted(data.id)) {
+                db.collection(key).doc(data.id).delete().catch(console.error);
+              }
+            });
 
             const localList = this.get(key) || [];
             const localMap = {};
@@ -81,7 +92,7 @@ const DataStore = {
               }
             });
             
-            // Filtrar do merged qualquer item que conste nos tombstones (veio do Firebase mas foi excluído localmente)
+            // Filtrar do merged qualquer item que conste nos tombstones (defesa em profundidade)
             const finalList = mergedList.filter(item => !this._isDeleted(item.id));
 
             localStorage.setItem(key, JSON.stringify(finalList));
@@ -252,18 +263,24 @@ const DataStore = {
             return;
           }
 
-          if (!snapshot || snapshot.empty) return;
+          if (!snapshot) return;
 
           const fbList = [];
+          // CORREÇÃO: Re-excluir do Firebase itens que constam nos tombstones locais
+          // mas ainda aparecem no snapshot (race condition entre delete e onSnapshot)
           snapshot.forEach(doc => {
             const data = doc.data();
-            if (data && data.id && !this._isDeleted(data.id)) {
+            if (!data || !data.id) return;
+            if (this._isDeleted(data.id)) {
+              // Item excluído localmente ainda existe no Firebase — re-exclui
+              db.collection(key).doc(data.id).delete().catch(console.error);
+            } else {
               fbList.push(data);
             }
           });
 
-          if (fbList.length === 0) return;
-
+          // CORREÇÃO: Não retornar prematuramente quando fbList está vazio após filtrar tombstones.
+          // O localStorage precisa ser atualizado para refletir a lista sem os itens excluídos.
           // Verificar se os dados realmente mudaram antes de atualizar
           const currentStr = localStorage.getItem(key) || '[]';
           const newStr = JSON.stringify(fbList);
@@ -513,17 +530,28 @@ const DataStore = {
  
   remove(key, id) {
     // 1. Registrar como excluído (tombstone) ANTES de qualquer operação
+    // O tombstone garante que o onSnapshot e o init() não restaurem este item
     this._registerDeleted(id);
     
     const data = this.get(key).filter(i => i.id !== id);
     // Atualiza localStorage sem batch no Firebase (delete individual abaixo)
     localStorage.setItem(key, JSON.stringify(data));
 
-    // 2. Exclui o documento individual do Firebase
+    // 2. Exclui o documento individual do Firebase com re-tentativas
     if (isFirebaseActive && db && key !== this.KEYS.SESSION) {
-      const attemptDelete = (retries = 3) => {
+      const attemptDelete = (retries = 5) => {
         db.collection(key).doc(id).delete()
-          .then(() => console.log(`✅ Registro ${id} excluído do Firebase (${key}).`))
+          .then(() => {
+            console.log(`✅ Registro ${id} excluído do Firebase (${key}).`);
+            // Confirma que o localStorage ainda não tem este item (proteção pós-onSnapshot)
+            const current = this.get(key);
+            const stillExists = current.some(i => i.id === id);
+            if (stillExists) {
+              const fixed = current.filter(i => i.id !== id);
+              localStorage.setItem(key, JSON.stringify(fixed));
+              console.warn(`⚠️ Item ${id} restaurado pelo onSnapshot após delete — removido novamente do localStorage.`);
+            }
+          })
           .catch(e => {
             console.error(`Erro ao deletar registro no Firebase para ${key}:`, e);
             if (retries > 0) {
