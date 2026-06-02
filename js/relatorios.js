@@ -60,7 +60,7 @@ const Relatorios = {
                   </label>
                 </div>
               </div>
-              <p style="font-size: 0.75rem; color: var(--text-3); margin-top: 12px;">* Itens obrigatórios: Código e Nome da Meta.</p>
+              <p style="font-size: 0.75rem; color: var(--text-3); margin-top: 12px;">* Itens obrigatórios: Código, Nome e Peso da Meta.</p>
             </div>
 
             <button class="btn btn-primary" onclick="Relatorios.exportarMetasParaExcel()" style="width: 100%; justify-content: center; padding: 12px; font-size: 1rem;">
@@ -96,10 +96,11 @@ const Relatorios = {
       };
 
       const dadosPlanilha = metas.map(m => {
-        // Objeto base sempre com Código e Nome
+        // Objeto base sempre com Código, Nome e Peso
         const linha = {
           'Código da Meta': m.codigo || '-',
-          'Nome da Meta': m.titulo || '-'
+          'Nome da Meta': m.titulo || '-',
+          'Peso (%)': m.peso || 0
         };
 
         // Configurações
