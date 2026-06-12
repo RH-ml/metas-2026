@@ -242,43 +242,41 @@ const Metas = {
     // --- Ordenação por Peso (maior primeiro) ---
     metas.sort((a, b) => (b.peso || 0) - (a.peso || 0));
 
-    // --- Agrupamento (Metas Compostas Primeiro, seguidas de suas filhas) ---
-    const compostas = metas.filter(m => m.tipo === 'composta');
+    // --- Agrupamento respeitando a ordem de peso ---
+    // Percorre a lista já ordenada por peso. Quando encontra uma composta,
+    // insere suas filhas logo abaixo — sem forçar compostas para o topo.
     const orderedMetas = [];
     const addedIds = new Set();
-    
-    compostas.forEach(c => {
-       if (!addedIds.has(c.id)) {
-           c.isSubMeta = false;
-           orderedMetas.push(c);
-           addedIds.add(c.id);
-       }
-       if (Array.isArray(c.composicao)) {
-           c.composicao.forEach(comp => {
-               // Busca direta pelo ID
-               let filha = metas.find(m => String(m.id) === String(comp.metaId));
-               // Se não encontrou, busca meta compartilhada que referencia a original
-               if (!filha) {
-                   filha = metas.find(m => m.tipo === 'compartilhada' && String(m.refMetaId) === String(comp.metaId));
-               }
-               if (filha && !addedIds.has(filha.id)) {
-                   filha.isSubMeta = true; 
-                   orderedMetas.push(filha);
-                   addedIds.add(filha.id);
-               }
-           });
-       }
-    });
-    
-    // Adicionar o restante das metas (já ordenadas por peso)
+
     metas.forEach(m => {
-       if (!addedIds.has(m.id)) {
-           m.isSubMeta = false;
-           orderedMetas.push(m);
-           addedIds.add(m.id);
-       }
+      if (addedIds.has(m.id)) return; // filha já inserida abaixo da sua composta
+
+      if (m.tipo === 'composta') {
+        m.isSubMeta = false;
+        orderedMetas.push(m);
+        addedIds.add(m.id);
+
+        // Insere as filhas imediatamente abaixo da composta
+        if (Array.isArray(m.composicao)) {
+          m.composicao.forEach(comp => {
+            let filha = metas.find(x => String(x.id) === String(comp.metaId));
+            if (!filha) {
+              filha = metas.find(x => x.tipo === 'compartilhada' && String(x.refMetaId) === String(comp.metaId));
+            }
+            if (filha && !addedIds.has(filha.id)) {
+              filha.isSubMeta = true;
+              orderedMetas.push(filha);
+              addedIds.add(filha.id);
+            }
+          });
+        }
+      } else {
+        m.isSubMeta = false;
+        orderedMetas.push(m);
+        addedIds.add(m.id);
+      }
     });
-    
+
     return orderedMetas;
   },
 
