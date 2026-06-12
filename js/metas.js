@@ -374,7 +374,7 @@ const Metas = {
         <table class="matrix-detail-table">
           <thead>
             <tr>
-              <th style="width: 80px;">Pontual</th>
+              <th style="width: 90px;">Pontual</th>
               ${meses.map(m => `<th>${m.mes}</th>`).join('')}
             </tr>
           </thead>
@@ -384,13 +384,10 @@ const Metas = {
             ${renderMatrixRow('D:', 'pontual', 'd', true, false)}
             ${renderMatrixRow('Nota:', 'pontual', 'nota', false, false)}
           </tbody>
-        </table>
-
-        <table class="matrix-detail-table" style="margin-top: 24px;">
           <thead>
             <tr>
-              <th style="width: 80px;">Acumulado</th>
-              ${meses.map(m => `<th>${m.mes}</th>`).join('')}
+              <th style="padding-top: 24px;">Acumulado</th>
+              ${meses.map(m => `<th style="padding-top: 24px;">${m.mes}</th>`).join('')}
             </tr>
           </thead>
           <tbody>
@@ -404,7 +401,7 @@ const Metas = {
                 const canUploadAnexo = isAdmin || isOwner;
                 return `
                 <td class="matrix-detail-cell text-primary">
-                  <div class="matrix-inline-edit" title="${canUploadAnexo ? 'Anexar Evidência' : 'Visualizar Evidências'}" style="cursor:pointer;" ${canUploadAnexo ? `onclick="Metas.openAnexoForm('${meta.id}', '${m.mes}')"` : `onclick="Metas.viewAnexosOnly('${meta.id}', '${m.mes}')"` }>
+                  <div class="matrix-inline-edit" title="${canUploadAnexo ? 'Anexar Evidência' : 'Visualizar Evidências'}" style="cursor:pointer;" ${canUploadAnexo ? `onclick="Metas.openAnexoForm('${meta.id}', '${m.mes}')"` : `onclick="Metas.viewAnexosOnly('${meta.id}', '${m.mes}')"`}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 2px;"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
                     (${m.anexos ? m.anexos.length : 0})
                   </div>

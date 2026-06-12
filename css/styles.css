@@ -2048,6 +2048,7 @@ select.form-input {
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
   border-right: 1px solid rgba(0, 0, 0, 0.02);
   vertical-align: middle;
+  white-space: nowrap;
 }
 
 .matrix-detail-table td:last-child {
