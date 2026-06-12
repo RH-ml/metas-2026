@@ -1016,9 +1016,13 @@ const DataStore = {
       
       // LOGICA DE ESCALONAMENTO: Se o valorAlvo (P do mês) for diferente do valor de 100% da curva,
       // devemos proporcionalizar todos os pontos da curva para este mês.
+      // EXCEÇÃO: curvas que não possuem nenhum score abaixo de 100 (ex: "100-120", "100", "120")
+      // usam limiares absolutos — o escalonamento não se aplica, pois o valor informado
+      // na curva já é o limiar fixo de resultado esperado.
       const base100 = parseFloat(v['100']);
       const currentTarget = parseFloat(meta.valorAlvo);
-      const scale = (base100 && base100 !== 0) ? (currentTarget / base100) : 1;
+      const minScore = Math.min(...Object.keys(v).map(k => parseFloat(k)).filter(k => !isNaN(k)));
+      const scale = (base100 && base100 !== 0 && minScore < 100) ? (currentTarget / base100) : 1;
 
       for (const key in v) {
         if (!Object.prototype.hasOwnProperty.call(v, key)) continue;
