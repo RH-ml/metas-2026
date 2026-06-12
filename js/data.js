@@ -529,7 +529,10 @@ const DataStore = {
  
   add(key, item) {
     const data = this.get(key);
-    item.id = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+    // Se o item já tiver um id customizado (ex: código da meta), usa esse; caso contrário gera um hash aleatório
+    if (!item.id) {
+      item.id = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+    }
     item.criadoEm = new Date().toISOString();
     item.atualizadoEm = item.criadoEm;
     data.push(item);

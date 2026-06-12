@@ -239,7 +239,10 @@ const Metas = {
     });
     metas = filtered;
     
-    // --- Ordenação e Agrupamento (Metas Compostas Primeiro, seguidas de suas filhas) ---
+    // --- Ordenação por Peso (maior primeiro) ---
+    metas.sort((a, b) => (b.peso || 0) - (a.peso || 0));
+
+    // --- Agrupamento (Metas Compostas Primeiro, seguidas de suas filhas) ---
     const compostas = metas.filter(m => m.tipo === 'composta');
     const orderedMetas = [];
     const addedIds = new Set();
@@ -267,7 +270,7 @@ const Metas = {
        }
     });
     
-    // Adicionar o restante das metas
+    // Adicionar o restante das metas (já ordenadas por peso)
     metas.forEach(m => {
        if (!addedIds.has(m.id)) {
            m.isSubMeta = false;
@@ -278,6 +281,7 @@ const Metas = {
     
     return orderedMetas;
   },
+
 
   setArea(a) {
     this.currentArea = a;
@@ -485,7 +489,7 @@ const Metas = {
     const acumLabels = { soma: 'Soma Simples', media: 'Média Simples', provider: 'Data Provider', repetir: 'Repetir Valores' };
     const polLabels = { maior_melhor: 'Maior Melhor (↑)', menor_melhor: 'Menor Melhor (↓)' };
     const unidLabels = { un: 'Número', 'R$': 'Moeda (R$)', horas: 'Horas', '%': 'Percentual (%)' };
-    const curvaLabels = { '0-80-100-120': '0 - 80 - 100 - 120', '80-100-120': '80 - 100 - 120', '80-100': '80 - 100', '100': '100 (Atingiu ou não)' };
+    const curvaLabels = { '0-80-100-120': '0 - 80 - 100 - 120', '80-100-120': '80 - 100 - 120', '80-100': '80 - 100', '100-120': '100 - 120', '100': '100 (Atingiu ou não)', '120': '120 (Superou ou não)' };
 
     let composicaoHtml = '';
     if (meta.tipo === 'composta' && Array.isArray(meta.composicao) && meta.composicao.length > 0) {
@@ -513,6 +517,7 @@ const Metas = {
       const entries = points.map(p => {
         let label = 'Nota ' + p;
         if (p === '100') label = 'Meta (100)';
+        if (p === '120') label = 'Superou (120)';
         return [label, meta.valoresCurva[p] !== undefined ? meta.valoresCurva[p] : '—'];
       });
       if (entries.length > 0) {
@@ -646,7 +651,9 @@ const Metas = {
               <option value="0-80-100-120" ${meta && meta.tipoCurva === '0-80-100-120' ? 'selected' : ''}>0 - 80 - 100 - 120</option>
               <option value="80-100-120" ${meta && meta.tipoCurva === '80-100-120' ? 'selected' : ''}>80 - 100 - 120</option>
               <option value="80-100" ${meta && meta.tipoCurva === '80-100' ? 'selected' : ''}>80 - 100</option>
+              <option value="100-120" ${meta && meta.tipoCurva === '100-120' ? 'selected' : ''}>100 - 120</option>
               <option value="100" ${meta && meta.tipoCurva === '100' ? 'selected' : ''}>100 (Atingiu ou não)</option>
+              <option value="120" ${meta && meta.tipoCurva === '120' ? 'selected' : ''}>120 (Superou ou não)</option>
             </select>
           </div>
 
@@ -1015,6 +1022,15 @@ const Metas = {
       Components.toast('Meta atualizada com sucesso!', 'success');
     } else {
       data.valorAtual = 0;
+      // Usa o código da meta (ex: MET0100) como ID do documento no Firebase para facilitar a localização
+      if (data.codigo && data.codigo.trim()) {
+        data.id = data.codigo.trim().toUpperCase().replace(/\s+/g, '_');
+        // Garante unicidade: se já existir uma meta com esse ID, adiciona sufixo
+        const existing = DataStore.getMetas().find(m => m.id === data.id);
+        if (existing) {
+          data.id = data.id + '_' + Date.now().toString(36).substr(-4);
+        }
+      }
       const newMeta = DataStore.add(DataStore.KEYS.METAS, data);
       DataStore.recalcMesesData(newMeta);
       DataStore.update(DataStore.KEYS.METAS, newMeta.id, newMeta);
