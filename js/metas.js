@@ -20,38 +20,44 @@ const Metas = {
   },
 
   render() {
-    const metas = this.getFilteredMetas();
-    const allMetas = DataStore.getMetas();
+    let metas = [];
+    let notaGlobal = null;
     const areas = DataStore.getAreas();
     
     // Meses para o filtro
     const mesesFiltro = ['JAN/26','FEV/26','MAR/26','ABR/26','MAI/26','JUN/26','JUL/26','AGO/26','SET/26','OUT/26','NOV/26','DEZ/26'];
     
-    // Calcula notas globais baseadas nas metas filtradas e competência atual
-    const validMetas = metas.filter(m => {
-      const p = DataStore.calcPerformance(m, false, this.currentCompetencia);
-      return p !== null;
-    });
+    const isAreaSelected = this.currentArea && this.currentArea !== 'todas' && this.currentArea !== 'all';
 
-    // Identificar metas que são filhas de metas compostas para ignorar seu peso individual
-    const childIds = new Set();
-    validMetas.forEach(m => {
-      if (m.tipo === 'composta' && Array.isArray(m.composicao)) {
-        m.composicao.forEach(c => childIds.add(c.metaId));
-      }
-    });
+    if (isAreaSelected) {
+      metas = this.getFilteredMetas();
+      
+      // Calcula notas globais baseadas nas metas filtradas e competência atual
+      const validMetas = metas.filter(m => {
+        const p = DataStore.calcPerformance(m, false, this.currentCompetencia);
+        return p !== null;
+      });
 
-    const pesoTotal = validMetas.reduce((s, m) => {
-      // Se a meta for filha de outra meta na lista, ou for compartilhada, o peso dela é ignorado (0)
-      const pesoEfetivo = childIds.has(m.id) || m.tipo === 'compartilhada' ? 0 : (m.peso || 0);
-      return s + pesoEfetivo;
-    }, 0);
+      // Identificar metas que são filhas de metas compostas para ignorar seu peso individual
+      const childIds = new Set();
+      validMetas.forEach(m => {
+        if (m.tipo === 'composta' && Array.isArray(m.composicao)) {
+          m.composicao.forEach(c => childIds.add(c.metaId));
+        }
+      });
 
-    const notaGlobal = pesoTotal > 0 ? validMetas.reduce((s, m) => {
-      const p = DataStore.calcPerformance(m, false, this.currentCompetencia);
-      const pesoEfetivo = childIds.has(m.id) || m.tipo === 'compartilhada' ? 0 : (m.peso || 0);
-      return s + (p * pesoEfetivo);
-    }, 0) / pesoTotal : 0;
+      const pesoTotal = validMetas.reduce((s, m) => {
+        // Se a meta for filha de outra meta na lista, ou for compartilhada, o peso dela é ignorado (0)
+        const pesoEfetivo = childIds.has(m.id) || m.tipo === 'compartilhada' ? 0 : (m.peso || 0);
+        return s + pesoEfetivo;
+      }, 0);
+
+      notaGlobal = pesoTotal > 0 ? validMetas.reduce((s, m) => {
+        const p = DataStore.calcPerformance(m, false, this.currentCompetencia);
+        const pesoEfetivo = childIds.has(m.id) || m.tipo === 'compartilhada' ? 0 : (m.peso || 0);
+        return s + (p * pesoEfetivo);
+      }, 0) / pesoTotal : 0;
+    }
 
     return `
       <div class="page-content fade-in" style="padding-top: 10px;">
@@ -71,7 +77,7 @@ const Metas = {
           <div style="display: flex; gap: 16px; align-items: center;">
             <div style="display: flex; flex-direction: column; align-items: center; background: rgba(245,136,58,0.15); padding: 6px 16px; border-radius: var(--radius-sm);">
               <span style="font-size: 0.75rem; color: var(--primary-light);">Nota Global</span>
-              <span style="font-size: 1.2rem; font-weight: 800; color: var(--primary);">${Components.formatNumber(notaGlobal)}</span>
+              <span style="font-size: 1.2rem; font-weight: 800; color: var(--primary);">${notaGlobal !== null ? Components.formatNumber(notaGlobal) : '—'}</span>
             </div>
             ${Auth.getSession()?.id === 'admin' ? `
             <button class="btn btn-primary" onclick="Metas.openForm()">
@@ -97,7 +103,7 @@ const Metas = {
                 </tr>
               </thead>
               <tbody>
-                ${metas.length === 0 ? `<tr><td colspan="7">${Components.emptyState(!this.currentArea ? 'Por favor, selecione uma área no filtro acima para visualizar as metas.' : 'Nenhuma meta encontrada para esta área/filtro.')}</td></tr>` : metas.map(m => this.renderMetaRow(m, this.currentCompetencia)).join('')}
+                ${metas.length === 0 ? `<tr><td colspan="7">${Components.emptyState(!isAreaSelected ? 'Selecione uma área para visualizar as metas, resultados e indicadores.' : 'Nenhuma meta encontrada para esta área/filtro.')}</td></tr>` : metas.map(m => this.renderMetaRow(m, this.currentCompetencia)).join('')}
               </tbody>
             </table>
           </div>
