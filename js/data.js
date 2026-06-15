@@ -1021,14 +1021,40 @@ const DataStore = {
   getRegras() { return this.get(this.KEYS.REGRAS); },
   getBonusByPeriodo(periodo) { return this.get(this.KEYS.BONUS).filter(b => b.periodo === periodo); },
 
-  calcPerformance(meta, _isRawCalc = false) {
+  calcPerformance(meta, _isRawCalc = false, targetMonthIndex = null) {
     if (!meta) return null;
     
     // Se for meta composta, compartilhada ou repetir, a performance é a nota já calculada no último mês válido
     // (a menos que estejamos fazendo o cálculo matemático base do mês, indicado por _isRawCalc)
     if (!_isRawCalc && (meta.tipo === 'composta' || meta.tipo === 'compartilhada' || meta.acumulacao === 'repetir')) {
        if (!meta.mesesData) return null;
-       // Encontrar o último mês que tem nota (não N/A)
+
+       // Se um mês específico foi solicitado, retorna a nota exata daquele mês
+       if (targetMonthIndex !== null && targetMonthIndex >= 0 && targetMonthIndex < meta.mesesData.length) {
+          const m = meta.mesesData[targetMonthIndex];
+          return m.acumulado && m.acumulado.nota !== null && m.acumulado.nota !== undefined ? m.acumulado.nota : null;
+       }
+
+       // Para compostas com acumulação SOMA: usar a nota do último mês onde o
+       // acumulado.r realmente MUDOU (= última entrada real de dados).
+       // Isso evita que meses de "carry-forward" (onde o R fica estático mas o P
+       // continua crescendo) mostrem uma nota degradada no painel.
+       if (meta.tipo === 'composta' && meta.acumulacao === 'soma') {
+          for (let i = meta.mesesData.length - 1; i >= 0; i--) {
+             const m = meta.mesesData[i];
+             if (!m.acumulado || m.acumulado.r === null || m.acumulado.r === undefined) continue;
+             const prevR = i > 0 ? (meta.mesesData[i - 1]?.acumulado?.r ?? null) : null;
+             // Detecta o último mês com entrada real: r mudou em relação ao mês anterior
+             if (prevR === null || prevR === undefined || m.acumulado.r !== prevR) {
+                // Retorna a nota ACUMULADA desse mês (nota do período até aqui)
+                return m.acumulado.nota !== null && m.acumulado.nota !== undefined
+                   ? m.acumulado.nota
+                   : null;
+             }
+          }
+       }
+
+       // Para outros tipos (media, repetir, compartilhada): último mês com nota válida
        for (let i = meta.mesesData.length - 1; i >= 0; i--) {
           const m = meta.mesesData[i];
           if (m.acumulado && m.acumulado.nota !== null) {
@@ -1038,7 +1064,17 @@ const DataStore = {
        return null;
     }
 
-    const r = meta.valorAtual;
+
+    // Para metas normais, usa o valor atual. Se targetMonthIndex for fornecido, pega do mês específico.
+    let r = meta.valorAtual;
+    let targetValP = meta.valorAlvo;
+    
+    if (targetMonthIndex !== null && meta.mesesData && targetMonthIndex >= 0 && targetMonthIndex < meta.mesesData.length) {
+       const monthData = meta.mesesData[targetMonthIndex];
+       r = monthData.acumulado ? monthData.acumulado.r : null;
+       targetValP = monthData.acumulado ? monthData.acumulado.p : meta.valorAlvo;
+    }
+
     if (r === null || r === undefined) return null;
     
     // Curva customizada
@@ -1052,8 +1088,9 @@ const DataStore = {
       // usam limiares absolutos — o escalonamento não se aplica, pois o valor informado
       // na curva já é o limiar fixo de resultado esperado.
       const base100 = parseFloat(v['100']);
-      const currentTarget = parseFloat(meta.valorAlvo);
+      const currentTarget = parseFloat(targetValP);
       const minScore = Math.min(...Object.keys(v).map(k => parseFloat(k)).filter(k => !isNaN(k)));
+
       const scale = (base100 && base100 !== 0 && minScore < 100) ? (currentTarget / base100) : 1;
 
       for (const key in v) {

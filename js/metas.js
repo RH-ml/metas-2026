@@ -6,16 +6,31 @@ const Metas = {
   currentArea: localStorage.getItem('metas_filter_area') || '',
   currentFilter: localStorage.getItem('metas_filter_status') || 'todas',
   currentSearch: '',
+  currentCompetencia: (() => {
+    const stored = localStorage.getItem('metas_filter_competencia');
+    if (stored !== null) return parseInt(stored, 10);
+    const d = new Date();
+    return (d.getMonth() === 0) ? 11 : d.getMonth() - 1;
+  })(),
+
+  setCompetencia(value) {
+    this.currentCompetencia = parseInt(value, 10);
+    localStorage.setItem('metas_filter_competencia', this.currentCompetencia);
+    App.renderPage();
+  },
 
   render() {
     const metas = this.getFilteredMetas();
     const allMetas = DataStore.getMetas();
     const areas = DataStore.getAreas();
     
-    // Calcula notas globais baseadas nas metas filtradas
+    // Meses para o filtro
+    const mesesFiltro = ['JAN/26','FEV/26','MAR/26','ABR/26','MAI/26','JUN/26','JUL/26','AGO/26','SET/26','OUT/26','NOV/26','DEZ/26'];
+    
+    // Calcula notas globais baseadas nas metas filtradas e competência atual
     const validMetas = metas.filter(m => {
-      const p = DataStore.calcPerformance(m);
-      return p !== null && m.valorAtual !== null;
+      const p = DataStore.calcPerformance(m, false, this.currentCompetencia);
+      return p !== null;
     });
 
     // Identificar metas que são filhas de metas compostas para ignorar seu peso individual
@@ -33,7 +48,7 @@ const Metas = {
     }, 0);
 
     const notaGlobal = pesoTotal > 0 ? validMetas.reduce((s, m) => {
-      const p = DataStore.calcPerformance(m);
+      const p = DataStore.calcPerformance(m, false, this.currentCompetencia);
       const pesoEfetivo = childIds.has(m.id) || m.tipo === 'compartilhada' ? 0 : (m.peso || 0);
       return s + (p * pesoEfetivo);
     }, 0) / pesoTotal : 0;
@@ -45,6 +60,12 @@ const Metas = {
             <div class="form-group" style="margin: 0; min-width: 280px; width: max-content;">
               <label style="display: block; font-size: 0.75rem; color: var(--text-3); margin-bottom: 4px; font-weight: 600;">Filtrar por Área</label>
               ${Components.treeSelector(this.currentArea, 'Metas.setArea')}
+            </div>
+            <div class="form-group" style="margin: 0; min-width: 150px;">
+              <label style="display: block; font-size: 0.75rem; color: var(--text-3); margin-bottom: 4px; font-weight: 600;">Competência</label>
+              <select class="form-control" onchange="Metas.setCompetencia(this.value)">
+                ${mesesFiltro.map((m, idx) => `<option value="${idx}" ${this.currentCompetencia === idx ? 'selected' : ''}>${m}</option>`).join('')}
+              </select>
             </div>
           </div>
           <div style="display: flex; gap: 16px; align-items: center;">
@@ -76,7 +97,7 @@ const Metas = {
                 </tr>
               </thead>
               <tbody>
-                ${metas.length === 0 ? `<tr><td colspan="7">${Components.emptyState(!this.currentArea ? 'Por favor, selecione uma área no filtro acima para visualizar as metas.' : 'Nenhuma meta encontrada para esta área/filtro.')}</td></tr>` : metas.map(m => this.renderMetaRow(m)).join('')}
+                ${metas.length === 0 ? `<tr><td colspan="7">${Components.emptyState(!this.currentArea ? 'Por favor, selecione uma área no filtro acima para visualizar as metas.' : 'Nenhuma meta encontrada para esta área/filtro.')}</td></tr>` : metas.map(m => this.renderMetaRow(m, this.currentCompetencia)).join('')}
               </tbody>
             </table>
           </div>
@@ -84,21 +105,22 @@ const Metas = {
       </div>`;
   },
 
-  renderMetaRow(meta) {
-    const perf = DataStore.calcPerformance(meta);
+  renderMetaRow(meta, targetMonthIndex) {
+    const perf = DataStore.calcPerformance(meta, false, targetMonthIndex);
     const notaPond = (perf * (meta.peso || 0)) / 100;
     
-    // Obter dados do último mês com resultado real OU marcado como N/A (qualquer apontamento)
-    const lastData = meta.mesesData
-      ? ([...meta.mesesData].reverse().find(m => (m.acumulado && m.acumulado.r !== null) || (m.pontual && m.pontual.na)) || meta.mesesData[11])
+    // Obter dados exatamente do mês da competência selecionada
+    const monthData = meta.mesesData && targetMonthIndex >= 0 && targetMonthIndex < meta.mesesData.length 
+      ? meta.mesesData[targetMonthIndex] 
       : null;
-    const pontualP = lastData && lastData.pontual ? lastData.pontual.p : meta.valorAlvo;
-    const pontualR = lastData && lastData.pontual ? lastData.pontual.r : meta.valorAtual;
-    const acumP = lastData && lastData.acumulado ? lastData.acumulado.p : meta.valorAlvo;
-    const acumR = lastData && lastData.acumulado ? lastData.acumulado.r : meta.valorAtual;
+      
+    const pontualP = monthData && monthData.pontual ? monthData.pontual.p : meta.valorAlvo;
+    const pontualR = monthData && monthData.pontual ? monthData.pontual.r : null;
+    const acumP = monthData && monthData.acumulado ? monthData.acumulado.p : meta.valorAlvo;
+    const acumR = monthData && monthData.acumulado ? monthData.acumulado.r : null;
     
-    // Verificar se último dado é N/A
-    const lastIsNa = lastData && lastData.pontual && lastData.pontual.na;
+    // Verificar se dado do mês é N/A
+    const lastIsNa = monthData && monthData.pontual && monthData.pontual.na;
     
     const format = val => meta.unidade === 'R$' ? Components.formatCurrency(val) : Components.formatNumber(val);
     const formatResult = (val, isNa) => {
@@ -120,13 +142,13 @@ const Metas = {
         <td style="text-align: center; color: var(--text-3);">${meta.peso}%</td>
         <td style="text-align: center; font-weight: 600;">${Components.formatNumber(notaPond)}</td>
         <td style="padding: 4px;">
-          <div class="matrix-cell ${getColorClass(lastData && lastData.pontual ? lastData.pontual.nota : null)}">
+          <div class="matrix-cell ${getColorClass(monthData && monthData.pontual ? monthData.pontual.nota : null)}">
             <div style="font-size: 0.75rem;">P: ${format(pontualP)}</div>
             <div style="font-size: 0.75rem;">R: ${formatResult(pontualR, lastIsNa)}</div>
           </div>
         </td>
         <td style="padding: 4px;">
-          <div class="matrix-cell ${getColorClass(lastData && lastData.acumulado ? lastData.acumulado.nota : null)}">
+          <div class="matrix-cell ${getColorClass(monthData && monthData.acumulado ? monthData.acumulado.nota : null)}">
             <div style="font-size: 0.75rem;">P: ${format(acumP)}</div>
             <div style="font-size: 0.75rem;">R: ${formatResult(acumR, lastIsNa)}</div>
           </div>
@@ -138,7 +160,7 @@ const Metas = {
         </td>
         <td style="text-align: center; font-size: 0.75rem; color: var(--text-3);">
           <div style="background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 4px;">
-            ${lastData ? lastData.mes.toUpperCase() : 'DEZ/26'}
+            ${monthData ? monthData.mes.toUpperCase() : 'DEZ/26'}
           </div>
         </td>
       </tr>`;
