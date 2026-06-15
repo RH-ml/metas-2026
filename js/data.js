@@ -688,7 +688,9 @@ const DataStore = {
     const mesesNomes = ['Jan/26','Fev/26','Mar/26','Abr/26','Mai/26','Jun/26','Jul/26','Ago/26','Set/26','Out/26','Nov/26','Dez/26'];
     
     // Processamento leve em memória, sem salvar de volta no localStorage aqui
-    return metas.map((m, index) => {
+    // IMPORTANTE: captura o resultado do map em `resolved` para poder fazer
+    // o recalc das compostas DEPOIS que todas as filhas já foram processadas.
+    const resolved = metas.map((m, index) => {
       // Sincronização básica de parâmetros para metas compartilhadas
       if (m.tipo === 'compartilhada' && m.refMetaId) {
         const source = metas.find(x => String(x.id) === String(m.refMetaId));
@@ -762,22 +764,21 @@ const DataStore = {
 
     // Recalc em memória das metas compostas para garantir que a nota apareça
     // corretamente no painel sem depender de um ciclo de salvamento/Firebase.
-    // Não salva de volta no localStorage (apenas atualiza o array em memória).
-    // Guard anti-recursão: recalcMesesData chamaria getMetas() internamente.
+    // Guard anti-recursão: usa `resolved` como contexto em vez de chamar getMetas() novamente.
     if (!this._inMemoryRecalcActive) {
       this._inMemoryRecalcActive = true;
       try {
-        const compostas = metas.filter(m => m.tipo === 'composta');
-        compostas.forEach(m => {
-          if (m.mesesData) this.recalcMesesData(m, metas);
+        resolved.filter(m => m.tipo === 'composta').forEach(m => {
+          if (m.mesesData) this.recalcMesesData(m, resolved);
         });
       } finally {
         this._inMemoryRecalcActive = false;
       }
     }
 
-    return metas;
+    return resolved;
   },
+  
   
   recalcMesesData(meta, _allMetas = null) {
     if (!meta || !meta.mesesData) return;
