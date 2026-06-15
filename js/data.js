@@ -759,9 +759,27 @@ const DataStore = {
       }
       return m;
     });
+
+    // Recalc em memória das metas compostas para garantir que a nota apareça
+    // corretamente no painel sem depender de um ciclo de salvamento/Firebase.
+    // Não salva de volta no localStorage (apenas atualiza o array em memória).
+    // Guard anti-recursão: recalcMesesData chamaria getMetas() internamente.
+    if (!this._inMemoryRecalcActive) {
+      this._inMemoryRecalcActive = true;
+      try {
+        const compostas = metas.filter(m => m.tipo === 'composta');
+        compostas.forEach(m => {
+          if (m.mesesData) this.recalcMesesData(m, metas);
+        });
+      } finally {
+        this._inMemoryRecalcActive = false;
+      }
+    }
+
+    return metas;
   },
   
-  recalcMesesData(meta) {
+  recalcMesesData(meta, _allMetas = null) {
     if (!meta || !meta.mesesData) return;
     
     let isAcumulativo = meta.acumulacao === 'soma';
@@ -828,7 +846,7 @@ const DataStore = {
           let weightedSumNota = 0;
           let totalValidWeight = 0;
           let hasValidData = false;
-          const allMetas = this.getMetas();
+          const allMetas = _allMetas || this.getMetas();
           
           meta.composicao.forEach(comp => {
              const child = allMetas.find(x => String(x.id) === String(comp.metaId));
@@ -924,44 +942,47 @@ const DataStore = {
        }
        
        m.acumulado.p = curAcumP;
-        if (curAcumR !== null) {
+
+        // ── COMPOSTA: calcula acumulado diretamente das filhas (independente do curAcumR próprio) ──
+        if (meta.tipo === 'composta' && Array.isArray(meta.composicao) && meta.composicao.length > 0) {
+           let somaRAcum = 0;
+           let weightedSumNotaAcum = 0;
+           let totalValidWeightAcum = 0;
+           let hasValidAcum = false;
+           const allM = _allMetas || this.getMetas();
+
+           meta.composicao.forEach(comp => {
+              const ch = allM.find(x => String(x.id) === String(comp.metaId));
+
+              let n = ch?.mesesData?.[index]?.acumulado?.nota;
+              const childAcumR = ch?.mesesData?.[index]?.acumulado?.r;
+
+              if (n !== null && n !== undefined) {
+                 const pesoOriginal = parseFloat(String(comp.peso).replace(',', '.')) || 0;
+                 somaRAcum += (childAcumR !== null && childAcumR !== undefined ? parseFloat(String(childAcumR).replace(',', '.')) : 0);
+                 weightedSumNotaAcum += (parseFloat(String(n).replace(',', '.')) * (pesoOriginal / 100));
+                 totalValidWeightAcum += pesoOriginal;
+                 hasValidAcum = true;
+              }
+           });
+
+           if (hasValidAcum && totalValidWeightAcum > 0) {
+              const scaleFactor = 100 / totalValidWeightAcum;
+              const acumR = meta.acumulacao === 'soma' ? somaRAcum : (somaRAcum * scaleFactor);
+              m.acumulado.r = acumR;
+              m.acumulado.d = calcDesvio(acumR, curAcumP);
+              m.acumulado.nota = weightedSumNotaAcum * scaleFactor;
+           } else {
+              m.acumulado.r = null;
+              m.acumulado.d = null;
+              m.acumulado.nota = null;
+           }
+        } else if (curAcumR !== null) {
+           // ── NÃO COMPOSTA: caminho normal ──
            m.acumulado.r = curAcumR;
            m.acumulado.d = calcDesvio(curAcumR, curAcumP);
-           
-           if (meta.tipo === 'composta' && Array.isArray(meta.composicao) && meta.composicao.length > 0) {
-              let somaRAcum = 0;         // Soma direta dos R acumulados das filhas
-              let weightedSumNotaAcum = 0;
-              let totalValidWeightAcum = 0;
-              let hasValidAcum = false;
-              const allM = this.getMetas();
-              
-              meta.composicao.forEach(comp => {
-                 const ch = allM.find(x => String(x.id) === String(comp.metaId));
-                 
-                 let n = ch?.mesesData?.[index]?.acumulado?.nota;
-                 const childAcumR = ch?.mesesData?.[index]?.acumulado?.r;
 
-                 if (n !== null && n !== undefined) {
-                     const pesoOriginal = parseFloat(String(comp.peso).replace(',', '.')) || 0;
-                     somaRAcum += (childAcumR !== null && childAcumR !== undefined ? parseFloat(String(childAcumR).replace(',', '.')) : 0);
-                     weightedSumNotaAcum += (parseFloat(String(n).replace(',', '.')) * (pesoOriginal / 100));
-                     totalValidWeightAcum += pesoOriginal;
-                     hasValidAcum = true;
-                  }
-              });
-              
-              if (hasValidAcum && totalValidWeightAcum > 0) {
-                 const scaleFactor = 100 / totalValidWeightAcum;
-                 // Para acumulação 'soma': R acumulado composto = soma direta dos Rs acumulados das filhas
-                 if (meta.acumulacao === 'soma') {
-                    m.acumulado.r = somaRAcum;
-                    m.acumulado.d = calcDesvio(somaRAcum, m.acumulado.p);
-                 }
-                 m.acumulado.nota = weightedSumNotaAcum * scaleFactor;
-              } else {
-                 m.acumulado.nota = null;
-              }
-           } else if (meta.acumulacao === 'repetir') {
+           if (meta.acumulacao === 'repetir') {
               m.acumulado.nota = m.pontual.nota;
            } else {
               m.acumulado.nota = this.calcPerformance({...meta, valorAlvo: curAcumP, valorAtual: curAcumR}, true);
