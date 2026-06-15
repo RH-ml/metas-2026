@@ -824,7 +824,7 @@ const DataStore = {
 
        // LOGICA DE META COMPOSTA: Se for composta (ou espelho de composta)
        if ((meta.tipo === 'composta' || meta.refTipoOriginal === 'composta') && Array.isArray(meta.composicao) && meta.composicao.length > 0) {
-          let weightedSumR = 0;
+          let somaR = 0;           // Soma direta dos R das filhas (para acumulação 'soma')
           let weightedSumNota = 0;
           let totalValidWeight = 0;
           let hasValidData = false;
@@ -846,7 +846,8 @@ const DataStore = {
 
                  if (n !== null && n !== undefined) {
                     const pesoOriginal = parseFloat(String(comp.peso).replace(',', '.')) || 0;
-                    weightedSumR += ((childR || 0) * (pesoOriginal / 100));
+                    // R: soma direta (não pondera o valor real pelo peso; peso só afeta a NOTA)
+                    somaR += (childR || 0);
                     weightedSumNota += (n * (pesoOriginal / 100));
                     totalValidWeight += pesoOriginal;
                     hasValidData = true;
@@ -855,10 +856,12 @@ const DataStore = {
           });
           
           if (hasValidData && totalValidWeight > 0) {
-             // Redimensionar para que a soma das notas válidas volte a representar 100%
+             // scaleFactor renormaliza a NOTA quando nem todas as filhas têm dados
              const scaleFactor = 100 / totalValidWeight;
-             rVal = weightedSumR * scaleFactor;
-             m.pontual.r = rVal; 
+             // Para acumulação 'soma': R composto = soma direta dos Rs das filhas
+             // Para outros modos (média etc.): mantém comportamento ponderado
+             rVal = (meta.acumulacao === 'soma') ? somaR : (somaR * scaleFactor);
+             m.pontual.r = rVal;
              m.pontual.nota = weightedSumNota * scaleFactor;
              m.pontual.na = false;
           } else {
@@ -926,6 +929,7 @@ const DataStore = {
            m.acumulado.d = calcDesvio(curAcumR, curAcumP);
            
            if (meta.tipo === 'composta' && Array.isArray(meta.composicao) && meta.composicao.length > 0) {
+              let somaRAcum = 0;         // Soma direta dos R acumulados das filhas
               let weightedSumNotaAcum = 0;
               let totalValidWeightAcum = 0;
               let hasValidAcum = false;
@@ -935,10 +939,11 @@ const DataStore = {
                  const ch = allM.find(x => String(x.id) === String(comp.metaId));
                  
                  let n = ch?.mesesData?.[index]?.acumulado?.nota;
+                 const childAcumR = ch?.mesesData?.[index]?.acumulado?.r;
 
-                                  
                  if (n !== null && n !== undefined) {
                      const pesoOriginal = parseFloat(String(comp.peso).replace(',', '.')) || 0;
+                     somaRAcum += (childAcumR !== null && childAcumR !== undefined ? parseFloat(String(childAcumR).replace(',', '.')) : 0);
                      weightedSumNotaAcum += (parseFloat(String(n).replace(',', '.')) * (pesoOriginal / 100));
                      totalValidWeightAcum += pesoOriginal;
                      hasValidAcum = true;
@@ -947,6 +952,11 @@ const DataStore = {
               
               if (hasValidAcum && totalValidWeightAcum > 0) {
                  const scaleFactor = 100 / totalValidWeightAcum;
+                 // Para acumulação 'soma': R acumulado composto = soma direta dos Rs acumulados das filhas
+                 if (meta.acumulacao === 'soma') {
+                    m.acumulado.r = somaRAcum;
+                    m.acumulado.d = calcDesvio(somaRAcum, m.acumulado.p);
+                 }
                  m.acumulado.nota = weightedSumNotaAcum * scaleFactor;
               } else {
                  m.acumulado.nota = null;
