@@ -908,14 +908,23 @@ const DataStore = {
           });
           
           if (hasValidData && totalValidWeight > 0) {
-             // scaleFactor renormaliza a NOTA quando nem todas as filhas têm dados
+             // scaleFactor renormaliza quando nem todas as filhas têm dados
              const scaleFactor = 100 / totalValidWeight;
-             // Para acumulação 'soma': R composto = soma direta dos Rs das filhas
-             // Para outros modos (média etc.): mantém comportamento ponderado
-             rVal = (meta.acumulacao === 'soma') ? somaR : (somaR * scaleFactor);
-             m.pontual.r = rVal;
-             m.pontual.nota = weightedSumNota * scaleFactor;
+             const compositeNota = weightedSumNota * scaleFactor;
+             m.pontual.nota = compositeNota;
              m.pontual.na = false;
+
+             if (meta.acumulacao === 'soma') {
+                // SOMA: R = soma direta dos Rs das filhas
+                rVal = somaR;
+             } else if (meta.acumulacao === 'media') {
+                // MEDIA SIMPLES: R = média ponderada das NOTAS das filhas
+                // Exemplo: A(nota=80,peso=50) + B(nota=50,peso=25) + C(nota=100,peso=25) = 77,50
+                rVal = compositeNota;
+             } else {
+                rVal = somaR * scaleFactor;
+             }
+             m.pontual.r = rVal;
           } else {
              rVal = null;
              m.pontual.r = null;
@@ -1003,10 +1012,22 @@ const DataStore = {
 
            if (hasValidAcum && totalValidWeightAcum > 0) {
               const scaleFactor = 100 / totalValidWeightAcum;
-              const acumR = meta.acumulacao === 'soma' ? somaRAcum : (somaRAcum * scaleFactor);
+              const compositeNotaAcum = weightedSumNotaAcum * scaleFactor;
+              m.acumulado.nota = compositeNotaAcum;
+
+              let acumR;
+              if (meta.acumulacao === 'soma') {
+                 // SOMA: R = soma direta dos Rs das filhas
+                 acumR = somaRAcum;
+              } else if (meta.acumulacao === 'media') {
+                 // MEDIA SIMPLES: R = média ponderada das NOTAS das filhas
+                 // Exemplo: A(nota=80,peso=50) + B(nota=50,peso=25) + C(nota=100,peso=25) = 77,50
+                 acumR = compositeNotaAcum;
+              } else {
+                 acumR = somaRAcum * scaleFactor;
+              }
               m.acumulado.r = acumR;
               m.acumulado.d = calcDesvio(acumR, curAcumP);
-              m.acumulado.nota = weightedSumNotaAcum * scaleFactor;
            } else {
               m.acumulado.r = null;
               m.acumulado.d = null;
