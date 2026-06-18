@@ -243,7 +243,40 @@ const DataStore = {
       localStorage.setItem(MIGRATION_KEY_V7, new Date().toISOString());
     }
 
-    // Inicia sincronização em tempo real para manter todos os usuários sincronizados
+    // Migração v8: Corrigir acumulados auto-replicados em metas Data Provider.
+    const MIGRATION_KEY_V8 = 'mp_migration_provider_fix_v8';
+    if (!localStorage.getItem(MIGRATION_KEY_V8)) {
+      console.log('Executando migracao v8 - limpando acumulado auto-replicado em metas Data Provider...');
+      let metasV8 = this.get(this.KEYS.METAS) || [];
+      let updatedV8 = false;
+      metasV8.forEach(function(m) {
+        if (m.acumulacao === 'provider' && m.mesesData && Array.isArray(m.mesesData)) {
+          m.mesesData.forEach(function(monthObj) {
+            var pontualR = monthObj.pontual ? monthObj.pontual.r : undefined;
+            var isNa = monthObj.pontual ? monthObj.pontual.na : false;
+            var acumR = monthObj.acumulado ? monthObj.acumulado.r : undefined;
+            if (pontualR === null && !isNa && acumR !== null && acumR !== undefined) {
+              monthObj.acumulado.r = null;
+              monthObj.acumulado.d = null;
+              monthObj.acumulado.nota = null;
+              updatedV8 = true;
+            }
+          });
+        }
+      });
+      if (updatedV8) {
+        localStorage.setItem(this.KEYS.METAS, JSON.stringify(metasV8));
+        if (isFirebaseActive && db) {
+          metasV8.filter(function(m) { return m.acumulacao === 'provider'; }).forEach(function(m) {
+            db.collection('mp_metas').doc(m.id).set(JSON.parse(JSON.stringify(m))).catch(function(e) { console.error(e); });
+          });
+        }
+        console.log('Migracao v8 concluida - acumulados indevidos removidos.');
+      }
+      localStorage.setItem(MIGRATION_KEY_V8, new Date().toISOString());
+    }
+
+    // Inicia sincronizacao em tempo real para manter todos os usuarios sincronizados
     this.startRealtimeSync();
   },
 
@@ -928,10 +961,11 @@ const DataStore = {
           curAcumP = pVal;
           curAcumR = rCount > 0 ? rAcum / rCount : null;
        } else if (meta.acumulacao === 'provider') {
-          // Para Data Provider, o acumulado pode ser editado manualmente.
-          // Preservamos o valor manual se existir; caso contrário, usamos uma média simples como base.
+          // Para Data Provider, pontual e acumulado são informados SEPARADAMENTE pelo usuário.
+          // O acumulado NUNCA é preenchido automaticamente com base no pontual.
+          // Preservamos o valor manual se existir; caso contrário, mantém null.
           curAcumP = (m.acumulado && m.acumulado.p !== null) ? m.acumulado.p : pAcum;
-          curAcumR = (m.acumulado && m.acumulado.r !== null) ? m.acumulado.r : (rCount > 0 ? rAcum / rCount : null);
+          curAcumR = (m.acumulado && m.acumulado.r !== null) ? m.acumulado.r : null;
        } else if (meta.acumulacao === 'repetir') {
           // Para Repetir Valores, o acumulado é sempre igual ao pontual do mês corrente.
           curAcumP = pVal;
