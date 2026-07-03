@@ -46,17 +46,11 @@ const Metas = {
         }
       });
 
-      const pesoTotal = validMetas.reduce((s, m) => {
-        // Se a meta for filha de outra meta na lista, ou for compartilhada, o peso dela é ignorado (0)
-        const pesoEfetivo = childIds.has(m.id) || m.tipo === 'compartilhada' ? 0 : (m.peso || 0);
-        return s + pesoEfetivo;
-      }, 0);
-
-      notaGlobal = pesoTotal > 0 ? validMetas.reduce((s, m) => {
+      notaGlobal = validMetas.length > 0 ? validMetas.reduce((s, m) => {
         const p = DataStore.calcPerformance(m, false, this.currentCompetencia);
         const pesoEfetivo = childIds.has(m.id) || m.tipo === 'compartilhada' ? 0 : (m.peso || 0);
-        return s + (p * pesoEfetivo);
-      }, 0) / pesoTotal : 0;
+        return s + ((p * pesoEfetivo) / 100);
+      }, 0) : null;
     }
 
     return `
