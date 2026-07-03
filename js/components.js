@@ -266,7 +266,16 @@ const Components = {
 
   closeModal() {
     const modal = document.getElementById('app-modal');
-    if (modal) { modal.classList.remove('active'); setTimeout(() => modal.remove(), 300); }
+    if (modal) {
+      modal.classList.remove('active');
+      setTimeout(() => {
+        modal.remove();
+        if (window.Metas && Metas._needsTableRefresh) {
+          Metas._needsTableRefresh = false;
+          if (typeof App !== 'undefined') App.refreshPage();
+        }
+      }, 300);
+    }
   },
 
   // Toast Notification
@@ -328,7 +337,7 @@ const Components = {
   },
 
   formatNumber(val) {
-    return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(val);
+    return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val);
   },
 
   // Empty state

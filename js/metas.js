@@ -1081,7 +1081,7 @@ const Metas = {
 
     td.innerHTML = `
       <div style="display:flex; flex-direction:column; gap:6px; align-items:center;" onclick="event.stopPropagation()">
-        <input type="text" id="inlineInput_${tdId}" class="form-input" style="width:70px; padding:4px; height:26px; font-size:0.8rem; text-align:center; background:var(--bg-2);" 
+        <input type="text" id="inlineInput_${tdId}" class="form-input" style="width:100px; padding:4px; height:26px; font-size:0.8rem; text-align:center; background:var(--bg-2);" 
           value="${currentNa ? '' : currentValue}"
           placeholder="0,00"
           ${currentNa ? 'disabled style="background:var(--bg-3); opacity:0.5;"' : ''}
@@ -1136,7 +1136,7 @@ const Metas = {
             this.syncResultToMirrors(metaId, mes);
           }
           Components.toast('N/A removido.', 'info');
-          DataStore._hasPendingSync = true;
+          Metas._needsTableRefresh = true;
           setTimeout(() => Metas.openDetail(metaId), 100);
         }
       }
@@ -1178,7 +1178,7 @@ const Metas = {
       }
 
       Components.toast('Apontamento salvo como N/A.', 'success');
-      DataStore._hasPendingSync = true;
+      Metas._needsTableRefresh = true;
       setTimeout(() => Metas.openDetail(metaId), 100);
       return;
     }
@@ -1217,7 +1217,7 @@ const Metas = {
     }
 
     Components.toast('Valor salvo com sucesso.', 'success');
-    DataStore._hasPendingSync = true;
+    Metas._needsTableRefresh = true;
     setTimeout(() => Metas.openDetail(metaId), 100);
   },
 

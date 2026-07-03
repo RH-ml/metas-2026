@@ -366,7 +366,6 @@ const DataStore = {
             this._refreshDebounce = setTimeout(() => {
               // Dupla verificação: não interrompe se modal abriu enquanto aguardava
               if (!document.querySelector('.modal-overlay')) {
-                this.globalRecalcMetas();
                 this._showSyncNotification();
                 App.refreshPage();
               }
@@ -384,7 +383,6 @@ const DataStore = {
       document.addEventListener('click', (e) => {
         if (this._hasPendingSync && !document.querySelector('.modal-overlay')) {
           this._hasPendingSync = false;
-          this.globalRecalcMetas();
           this._showSyncNotification();
           if (typeof App !== 'undefined') App.refreshPage();
         }
