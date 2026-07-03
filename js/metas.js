@@ -23,15 +23,15 @@ const Metas = {
     let metas = [];
     let notaGlobal = null;
     const areas = DataStore.getAreas();
-    
+
     // Meses para o filtro
-    const mesesFiltro = ['JAN/26','FEV/26','MAR/26','ABR/26','MAI/26','JUN/26','JUL/26','AGO/26','SET/26','OUT/26','NOV/26','DEZ/26'];
-    
+    const mesesFiltro = ['JAN/26', 'FEV/26', 'MAR/26', 'ABR/26', 'MAI/26', 'JUN/26', 'JUL/26', 'AGO/26', 'SET/26', 'OUT/26', 'NOV/26', 'DEZ/26'];
+
     const isAreaSelected = this.currentArea && this.currentArea !== 'todas' && this.currentArea !== 'all';
 
     if (isAreaSelected) {
       metas = this.getFilteredMetas();
-      
+
       // Calcula notas globais baseadas nas metas filtradas e competência atual
       const validMetas = metas.filter(m => {
         const p = DataStore.calcPerformance(m, false, this.currentCompetencia);
@@ -114,32 +114,32 @@ const Metas = {
   renderMetaRow(meta, targetMonthIndex) {
     const perf = DataStore.calcPerformance(meta, false, targetMonthIndex);
     const notaPond = (perf * (meta.peso || 0)) / 100;
-    
+
     // Obter dados exatamente do mês da competência selecionada
-    const monthData = meta.mesesData && targetMonthIndex >= 0 && targetMonthIndex < meta.mesesData.length 
-      ? meta.mesesData[targetMonthIndex] 
+    const monthData = meta.mesesData && targetMonthIndex >= 0 && targetMonthIndex < meta.mesesData.length
+      ? meta.mesesData[targetMonthIndex]
       : null;
-      
+
     const pontualP = monthData && monthData.pontual ? monthData.pontual.p : meta.valorAlvo;
     const pontualR = monthData && monthData.pontual ? monthData.pontual.r : null;
     const acumP = monthData && monthData.acumulado ? monthData.acumulado.p : meta.valorAlvo;
     const acumR = monthData && monthData.acumulado ? monthData.acumulado.r : null;
-    
+
     // Verificar se dado do mês é N/A
     const lastIsNa = monthData && monthData.pontual && monthData.pontual.na;
-    
+
     const format = val => meta.unidade === 'R$' ? Components.formatCurrency(val) : Components.formatNumber(val);
     const formatResult = (val, isNa) => {
       if (isNa) return 'N/A';
       return val === null || val === undefined ? '—' : format(val);
     };
-    
+
     // Determinar cor da nota
     const getColorClass = (val) => {
       if (val === null || val === undefined) return '';
       return val >= 100 ? 'matrix-bg-green' : val >= 80 ? 'matrix-bg-yellow' : 'matrix-bg-red';
     };
-    
+
     return `
       <tr class="matrix-row ${meta.isSubMeta ? 'matrix-row-sub' : ''}" onclick="Metas.openDetail('${meta.id}')" style="cursor: pointer; transition: var(--transition); ${meta.isSubMeta ? 'background: rgba(255,255,255,0.02);' : ''}">
         <td style="font-weight: 600; font-size: 0.85rem; padding-right: 16px; ${meta.isSubMeta ? 'padding-left: 32px; border-left: 2px solid rgba(255,255,255,0.1);' : ''}">
@@ -176,7 +176,7 @@ const Metas = {
     const session = Auth.getSession() || {};
     const isAdmin = session.id === 'admin' || session.nivel === 'Admin';
     const isDiretoria = session.nivel === 'Diretoria';
-    
+
     // Se não há área selecionada, não define nada (força seleção do usuário).
     // Removido o fallback para área do usuário e admin (que marcava 'todas').
 
@@ -253,20 +253,20 @@ const Metas = {
       if (m.tipo === 'compartilhada' && (this.currentArea === 'todas' || this.currentArea === 'all')) {
         return false;
       }
-      
+
       if (isSearching) {
         const s = this.currentSearch.toLowerCase();
         const responsavel = m.responsavelId ? DataStore.getUserById(m.responsavelId) : null;
         const respNome = responsavel ? responsavel.nome.toLowerCase() : '';
-        const matchSearch = (m.titulo || '').toLowerCase().includes(s) || 
-                            (m.codigo || '').toLowerCase().includes(s) ||
-                            respNome.includes(s);
+        const matchSearch = (m.titulo || '').toLowerCase().includes(s) ||
+          (m.codigo || '').toLowerCase().includes(s) ||
+          respNome.includes(s);
         return matchSearch;
       }
       return true;
     });
     metas = filtered;
-    
+
     // --- Ordenação por Peso (maior primeiro) ---
     metas.sort((a, b) => (b.peso || 0) - (a.peso || 0));
 
@@ -352,37 +352,37 @@ const Metas = {
       <tr class="matrix-detail-row">
         <td class="matrix-detail-label">${label}</td>
         ${meses.map(m => {
-          const isNa = m.pontual && m.pontual.na;
-          const val = getMatrixFieldValue(m, dataKey, field);
-          const notaValue = getMatrixFieldValue(m, dataKey, 'nota');
-          const colorClass = hideClass ? '' : getColorClass(notaValue);
-          const cellId = `cell_${meta.id}_${dataKey}_${field}_${m.mes.replace(/\//g,'_')}`;
-          
-          let content = isPerc ? formatPerc(val) : (field === 'nota' ? formatNota(val) : format(val));
-          const isProvider = meta.acumulacao === 'provider';
-          const isEditablePrevisto = label === 'P:' && (dataKey === 'pontual' || (dataKey === 'acumulado' && isProvider)) && isAdmin;
-          const isEditableResult = label === 'R:' && (dataKey === 'pontual' || (dataKey === 'acumulado' && isProvider)) && meta.tipo !== 'composta' && (isAdmin || isOwner);
-          const isEditable = isEditablePrevisto || isEditableResult;
+      const isNa = m.pontual && m.pontual.na;
+      const val = getMatrixFieldValue(m, dataKey, field);
+      const notaValue = getMatrixFieldValue(m, dataKey, 'nota');
+      const colorClass = hideClass ? '' : getColorClass(notaValue);
+      const cellId = `cell_${meta.id}_${dataKey}_${field}_${m.mes.replace(/\//g, '_')}`;
 
-          if (isEditable) {
-            const displayValue = isNa ? '<span style="color: var(--text-3); font-weight: 600;">N/A</span>' : ((val === null || val === undefined || val === '') ? '<span style="color: var(--text-3);">-</span>' : content);
-            content = `
+      let content = isPerc ? formatPerc(val) : (field === 'nota' ? formatNota(val) : format(val));
+      const isProvider = meta.acumulacao === 'provider';
+      const isEditablePrevisto = label === 'P:' && (dataKey === 'pontual' || (dataKey === 'acumulado' && isProvider)) && isAdmin;
+      const isEditableResult = label === 'R:' && (dataKey === 'pontual' || (dataKey === 'acumulado' && isProvider)) && meta.tipo !== 'composta' && (isAdmin || isOwner);
+      const isEditable = isEditablePrevisto || isEditableResult;
+
+      if (isEditable) {
+        const displayValue = isNa ? '<span style="color: var(--text-3); font-weight: 600;">N/A</span>' : ((val === null || val === undefined || val === '') ? '<span style="color: var(--text-3);">-</span>' : content);
+        content = `
               <div class="matrix-inline-edit" title="Editar Valor" onclick="Metas.enableInlineEdit('${meta.id}', '${m.mes}', '${cellId}', '${dataKey}', '${field}')" style="display:flex; align-items:center; justify-content:center; gap:6px;">
                 <span>${displayValue}</span>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
               </div>`;
-          } else {
-            if (label === 'R:' && dataKey === 'pontual') {
-               content = isNa ? '<span style="color: var(--text-3); font-weight: 600;">N/A</span>' : '-';
-            }
-          }
-          
-          // Se for N/A, aplicar estilos específicos
-          const naClass = isNa && (label === 'R:' || label === 'D:' || label === 'Nota:') ? 'matrix-cell-na' : '';
-          let cellContent = isNa && (label === 'D:' || label === 'Nota:') ? '<span style="color: var(--text-3); font-style: italic;">—</span>' : content;
-          
-          return `<td class="matrix-detail-cell ${colorClass} ${naClass}" id="${cellId}" data-na="${isNa}" ${isEditableResult ? `data-value="${val !== null && val !== undefined ? val : ''}"` : ''}>${cellContent}</td>`;
-        }).join('')}
+      } else {
+        if (label === 'R:' && dataKey === 'pontual') {
+          content = isNa ? '<span style="color: var(--text-3); font-weight: 600;">N/A</span>' : '-';
+        }
+      }
+
+      // Se for N/A, aplicar estilos específicos
+      const naClass = isNa && (label === 'R:' || label === 'D:' || label === 'Nota:') ? 'matrix-cell-na' : '';
+      let cellContent = isNa && (label === 'D:' || label === 'Nota:') ? '<span style="color: var(--text-3); font-style: italic;">—</span>' : content;
+
+      return `<td class="matrix-detail-cell ${colorClass} ${naClass}" id="${cellId}" data-na="${isNa}" ${isEditableResult ? `data-value="${val !== null && val !== undefined ? val : ''}"` : ''}>${cellContent}</td>`;
+    }).join('')}
       </tr>`;
 
     const content = `
@@ -426,15 +426,15 @@ const Metas = {
             <tr class="matrix-detail-row">
               <td class="matrix-detail-label">Anexo:</td>
               ${meses.map((m, idx) => {
-                const canUploadAnexo = isAdmin || isOwner;
-                return `
+      const canUploadAnexo = isAdmin || isOwner;
+      return `
                 <td class="matrix-detail-cell text-primary">
                   <div class="matrix-inline-edit" title="${canUploadAnexo ? 'Anexar Evidência' : 'Visualizar Evidências'}" style="cursor:pointer;" ${canUploadAnexo ? `onclick="Metas.openAnexoForm('${meta.id}', '${m.mes}')"` : `onclick="Metas.viewAnexosOnly('${meta.id}', '${m.mes}')"`}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 2px;"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
                     (${m.anexos ? m.anexos.length : 0})
                   </div>
                 </td>`;
-              }).join('')}
+    }).join('')}
             </tr>
           </tbody>
         </table>
@@ -454,15 +454,15 @@ const Metas = {
               </thead>
               <tbody>
                 ${acoes.map(a => {
-                  const progresso = a.progresso || 0;
-                  const prazo = a.prazo ? new Date(a.prazo) : null;
-                  const hoje = new Date();
-                  let statusAuto = 'nao_iniciada';
-                  if (progresso === 100) statusAuto = 'concluida';
-                  else if (progresso > 0) statusAuto = 'em_andamento';
-                  else if (prazo && hoje > prazo) statusAuto = 'atrasada';
-                  
-                  return `
+      const progresso = a.progresso || 0;
+      const prazo = a.prazo ? new Date(a.prazo) : null;
+      const hoje = new Date();
+      let statusAuto = 'nao_iniciada';
+      if (progresso === 100) statusAuto = 'concluida';
+      else if (progresso > 0) statusAuto = 'em_andamento';
+      else if (prazo && hoje > prazo) statusAuto = 'atrasada';
+
+      return `
                   <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer;" onclick="Metas.openAcaoForm('${meta.id}', '${a.id}')">
                     <td style="padding: 12px; font-size: 0.85rem; font-weight: 600; color: var(--text-1); vertical-align: middle;">${a.titulo}</td>
                     <td style="padding: 12px; font-size: 0.8rem; color: var(--text-2); vertical-align: middle;">
@@ -471,7 +471,7 @@ const Metas = {
                         <br>
                         <div style="margin-top: 4px;">
                           ${a.anexo.url ? `<a href="${a.anexo.url}" target="_blank" onclick="event.stopPropagation()" style="font-size: 0.7rem; color: var(--success); text-decoration: underline; display: inline-flex; align-items: center; gap: 3px;">📎 ${a.anexo.nome}</a>` : `<span style="font-size: 0.7rem; color: var(--success);">📎 ${a.anexo.nome}</span>`}
-                          ${a.anexo.usuarioNome ? `<span style="font-size: 0.65rem; color: var(--text-3); margin-left: 6px;">por ${a.anexo.usuarioNome} em ${new Date(a.anexo.dataHora || a.anexo.data).toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'})}</span>` : ''}
+                          ${a.anexo.usuarioNome ? `<span style="font-size: 0.65rem; color: var(--text-3); margin-left: 6px;">por ${a.anexo.usuarioNome} em ${new Date(a.anexo.dataHora || a.anexo.data).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>` : ''}
                         </div>
                       ` : ''}
                     </td>
@@ -483,7 +483,7 @@ const Metas = {
                       </div>
                     </td>
                   </tr>`;
-                }).join('')}
+    }).join('')}
               </tbody>
             </table>
           </div>
@@ -521,9 +521,9 @@ const Metas = {
           <div style="font-size: 0.75rem; color: var(--text-3); font-weight: 600; text-transform: uppercase; margin-bottom: 8px;">Composição</div>
           <div style="display: flex; flex-direction: column; gap: 6px;">
             ${meta.composicao.map(c => {
-              const cm = DataStore.getMetaById(c.metaId);
-              return '<div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg-3);padding:10px 14px;border-radius:var(--radius-xs);border:1px solid rgba(255,255,255,0.05);"><span style="font-size:0.85rem;font-weight:500;">' + (cm ? cm.codigo + ' - ' + cm.titulo : 'N/A') + '</span><span class="badge badge-neutral" style="font-size:0.75rem;">' + c.peso + '%</span></div>';
-            }).join('')}
+        const cm = DataStore.getMetaById(c.metaId);
+        return '<div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg-3);padding:10px 14px;border-radius:var(--radius-xs);border:1px solid rgba(255,255,255,0.05);"><span style="font-size:0.85rem;font-weight:500;">' + (cm ? cm.codigo + ' - ' + cm.titulo : 'N/A') + '</span><span class="badge badge-neutral" style="font-size:0.75rem;">' + c.peso + '%</span></div>';
+      }).join('')}
           </div>
         </div>`;
     }
@@ -584,7 +584,7 @@ const Metas = {
     const meta = editId ? DataStore.getMetaById(editId) : null;
     const users = DataStore.getUsers();
     const isEdit = !!meta;
-    
+
     // Suggest code for new meta
     let sugCode = '';
     if (!isEdit) {
@@ -643,10 +643,10 @@ const Metas = {
           <div class="form-group">
             <label class="form-label">Formato (Unidade)</label>
             <select class="form-input" name="unidade">
-              ${['Número','Moeda','Horas','%'].map(u => {
-                const val = u === 'Número' ? 'un' : u === 'Moeda' ? 'R$' : u === 'Horas' ? 'horas' : '%';
-                return `<option value="${val}" ${meta && meta.unidade === val ? 'selected' : ''}>${u}</option>`;
-              }).join('')}
+              ${['Número', 'Moeda', 'Horas', '%'].map(u => {
+      const val = u === 'Número' ? 'un' : u === 'Moeda' ? 'R$' : u === 'Horas' ? 'horas' : '%';
+      return `<option value="${val}" ${meta && meta.unidade === val ? 'selected' : ''}>${u}</option>`;
+    }).join('')}
             </select>
           </div>
 
@@ -713,7 +713,7 @@ const Metas = {
       <button class="btn btn-primary" onclick="document.getElementById('metaForm').requestSubmit()">${isEdit ? 'Salvar Alterações' : 'Criar Meta'}</button>`;
 
     Components.openModal(isEdit ? 'Editar Meta' : 'Nova Meta', content, footer);
-    
+
     // Inject the saved values into the window so we can render them properly
     window._tempMetaCurva = meta ? meta.valoresCurva : null;
     window._tempEditId = editId;
@@ -800,16 +800,16 @@ const Metas = {
           <label class="form-label">Corresponsáveis (Quem vai receber essa meta?)</label>
           <div style="max-height: 150px; overflow-y: auto; border: 1px solid var(--border); padding: 8px; border-radius: 6px; background: var(--bg-1);">
             ${users.map(u => {
-              const uArea = DataStore.getAreaAtual(u.id);
-              const areaNome = uArea ? uArea.nome : 'Sem Área';
-              const checked = meta?.coresponsavelIds?.includes(u.id) ? 'checked' : '';
-              return `
+        const uArea = DataStore.getAreaAtual(u.id);
+        const areaNome = uArea ? uArea.nome : 'Sem Área';
+        const checked = meta?.coresponsavelIds?.includes(u.id) ? 'checked' : '';
+        return `
                 <label style="display:flex; align-items:center; gap:8px; margin-bottom:6px; font-size:0.85rem; cursor:pointer;">
                   <input type="checkbox" name="coresponsavel" value="${u.id}" ${checked}>
                   <span>${u.nome} <small style="color:var(--text-3)">(${areaNome})</small></span>
                 </label>
               `;
-            }).join('')}
+      }).join('')}
           </div>
         </div>
       `;
@@ -831,14 +831,14 @@ const Metas = {
     if (form.unidade) form.unidade.value = source.unidade || 'un';
     if (form.acumulacao) form.acumulacao.value = source.acumulacao || 'soma';
     if (form.polaridade) form.polaridade.value = source.polaridade || 'maior_melhor';
-    
+
     const tipoCurvaSelect = document.getElementById('metaTipoCurva');
     if (tipoCurvaSelect) {
       tipoCurvaSelect.value = source.tipoCurva || '0-80-100-120';
       window._tempMetaCurva = source.valoresCurva;
       this.renderCurvaInputs();
     }
-    
+
     if (form.titulo && (!form.titulo.value || form.titulo.value.trim() === "")) {
       form.titulo.value = source.titulo;
     }
@@ -879,19 +879,19 @@ const Metas = {
     const respId = document.getElementById('metaResponsavel').value;
     const pesoInput = parseFloat(document.getElementById('metaPeso').value) || 0;
     let somaOutros = 0;
-    
+
     if (respId) {
       const metasResp = DataStore.getMetas().filter(m => m.responsavelId === respId && m.id !== window._tempEditId);
       somaOutros = metasResp.reduce((s, m) => s + (m.peso || 0), 0);
     }
-    
+
     const total = somaOutros + pesoInput;
     const bar = document.getElementById('pesoProgressBar');
     const label = document.getElementById('pesoTotalLabel');
-    
+
     label.textContent = `${total}% / 100%`;
     bar.style.width = `${Math.min(100, total)}%`;
-    
+
     if (total > 100) {
       bar.style.background = 'var(--danger)';
       label.style.color = 'var(--danger)';
@@ -905,10 +905,10 @@ const Metas = {
     const tipo = document.getElementById('metaTipoCurva').value;
     const container = document.getElementById('curvaInputsContainer');
     const saved = window._tempMetaCurva || {};
-    
+
     let html = '';
     const points = tipo.split('-');
-    
+
     points.forEach(p => {
       let v = saved[p] !== undefined ? saved[p] : '';
       let color = p === '100' ? 'var(--success)' : p === '120' ? 'var(--primary)' : p === '80' ? '#E8A81C' : 'var(--danger)';
@@ -919,148 +919,148 @@ const Metas = {
         </div>
       `;
     });
-    
+
     container.innerHTML = html;
   },
 
   async saveMeta(e, editId) {
     e.preventDefault();
     const form = e.target;
-    
+
     const submitBtn = document.querySelector('.modal-footer button.btn-primary');
     if (submitBtn) submitBtn.disabled = true;
 
     try {
       const data = Object.fromEntries(new FormData(form));
-    
-    // Validation
-    const respId = data.responsavelId;
-    const pesoInput = parseFloat(data.peso) || 0;
-    const metasResp = DataStore.getMetas().filter(m => m.responsavelId === respId && m.id !== editId);
-    const somaOutros = metasResp.reduce((s, m) => s + (m.peso || 0), 0);
-    
-    if ((somaOutros + pesoInput) > 100) {
-      Components.toast('A soma dos pesos para este responsável não pode exceder 100%!', 'error');
-      return;
-    }
-    
-    // Extract Curve Values
-    const tipoCurva = data.tipoCurva || '0-80-100-120';
-    const points = tipoCurva.split('-');
-    const valoresCurva = {};
-    points.forEach(p => {
-      valoresCurva[p] = parseFloat(data[`curva_${p}`]) || 0;
-      delete data[`curva_${p}`]; // remove from main data object
-    });
-    
-    data.tipoCurva = tipoCurva;   // Garante que tipoCurva seja sempre salvo corretamente
-    data.valoresCurva = valoresCurva;
-    data.peso = pesoInput;
-    
-    const fileInput = document.getElementById('metaAnexoRegra');
-    const file = fileInput ? fileInput.files[0] : null;
 
-    if (editId) {
-      const oldMeta = DataStore.getMetaById(editId);
-      if (oldMeta && oldMeta.anexoRegra) {
-        data.anexoRegra = oldMeta.anexoRegra;
-      }
-    }
+      // Validation
+      const respId = data.responsavelId;
+      const pesoInput = parseFloat(data.peso) || 0;
+      const metasResp = DataStore.getMetas().filter(m => m.responsavelId === respId && m.id !== editId);
+      const somaOutros = metasResp.reduce((s, m) => s + (m.peso || 0), 0);
 
-    if (file) {
-      if (typeof GraphAPI !== 'undefined') {
-        Components.toast('Fazendo upload do anexo da regra...', 'info');
-        const safeMetaTitle = data.titulo.replace(/[^a-zA-Z0-9 _-]/g, '').trim() || 'RegraMeta';
-        const extension = file.name.includes('.') ? file.name.split('.').pop() : '';
-        const newFileName = `Regra_${safeMetaTitle}_${Date.now()}.${extension}`;
-        
-        try {
-          const graphData = await GraphAPI.uploadFile(newFileName, file, 'RegrasMetas');
-          data.anexoRegra = {
-            nome: newFileName,
-            url: graphData.webUrl || null,
-            downloadUrl: graphData.downloadUrl || null,
-            usuarioNome: Auth.getSession()?.nome || 'Admin',
-            dataHora: new Date().toISOString()
-          };
-        } catch (err) {
-           console.error("Erro no upload do anexo da regra", err);
-           Components.toast('Erro no upload do anexo. Salvando meta sem o novo anexo.', 'error');
-        }
-      }
-    }
-    
-    // Processar campos extras (Composição e Compartilhamento)
-    if (data.tipo === 'composta') {
-      const composicao = [];
-      const rows = document.querySelectorAll('.composicao-row');
-      rows.forEach((row, i) => {
-        const metaId = row.querySelector('select').value;
-        const peso = parseFloat(row.querySelector('input[type="number"]').value) || 0;
-        if (metaId) composicao.push({ metaId, peso });
-      });
-      
-      const totalPeso = composicao.reduce((s, c) => s + c.peso, 0);
-      if (totalPeso !== 100 && composicao.length > 0) {
-        Components.toast('A soma dos pesos da composição deve ser exatamente 100%!', 'error');
+      if ((somaOutros + pesoInput) > 100) {
+        Components.toast('A soma dos pesos para este responsável não pode exceder 100%!', 'error');
         return;
       }
-      data.composicao = composicao;
-      
-      // Regra de Integridade: Zerar peso das metas filhas no sistema para evitar dupla contagem
-      let metasStore = DataStore.get(DataStore.KEYS.METAS);
-      let alterouFilhas = false;
-      composicao.forEach(c => {
-        const idx = metasStore.findIndex(x => x.id === c.metaId);
-        if (idx !== -1 && metasStore[idx].peso !== 0) {
-          metasStore[idx].peso = 0;
-          alterouFilhas = true;
-        }
-      });
-      if (alterouFilhas) {
-        DataStore.set(DataStore.KEYS.METAS, metasStore);
-        Components.toast('Pesos das metas individuais filhas foram ajustados para 0% para evitar duplicidade.', 'info');
-      }
-    } else if (data.tipo === 'compartilhada') {
-      const checkboxes = document.querySelectorAll('input[name="coresponsavel"]:checked');
-      data.coresponsavelIds = Array.from(checkboxes).map(cb => cb.value);
-    }
 
-    data.valorAlvo = valoresCurva['100'] || 0; 
-    // We keep valorAtual as the accumulated R of the current month if existing
-    
-    if (editId) {
-      const oldMeta = DataStore.getMetaById(editId);
-      if (oldMeta) {
-        data.mesesData = oldMeta.mesesData || [];
-        data.valorAtual = oldMeta.valorAtual;
-        if (oldMeta.composicao && !data.composicao) data.composicao = oldMeta.composicao;
-        if (oldMeta.refMetaId && !data.refMetaId) data.refMetaId = oldMeta.refMetaId;
-        if (oldMeta.refTipoOriginal && !data.refTipoOriginal) data.refTipoOriginal = oldMeta.refTipoOriginal;
-        DataStore.recalcMesesData(data);
-      }
-      DataStore.update(DataStore.KEYS.METAS, editId, data);
-      this.recalcParentMetas(editId); 
-      this.syncResultToMirrors(editId); // Push curve and target value updates to all mirrors in Firebase
-      Components.toast('Meta atualizada com sucesso!', 'success');
-    } else {
-      data.valorAtual = 0;
-      // Usa o código da meta (ex: MET0100) como ID do documento no Firebase para facilitar a localização
-      if (data.codigo && data.codigo.trim()) {
-        data.id = data.codigo.trim().toUpperCase().replace(/\s+/g, '_');
-        // Garante unicidade: se já existir uma meta com esse ID, adiciona sufixo
-        const existing = DataStore.getMetas().find(m => m.id === data.id);
-        if (existing) {
-          data.id = data.id + '_' + Date.now().toString(36).substr(-4);
+      // Extract Curve Values
+      const tipoCurva = data.tipoCurva || '0-80-100-120';
+      const points = tipoCurva.split('-');
+      const valoresCurva = {};
+      points.forEach(p => {
+        valoresCurva[p] = parseFloat(data[`curva_${p}`]) || 0;
+        delete data[`curva_${p}`]; // remove from main data object
+      });
+
+      data.tipoCurva = tipoCurva;   // Garante que tipoCurva seja sempre salvo corretamente
+      data.valoresCurva = valoresCurva;
+      data.peso = pesoInput;
+
+      const fileInput = document.getElementById('metaAnexoRegra');
+      const file = fileInput ? fileInput.files[0] : null;
+
+      if (editId) {
+        const oldMeta = DataStore.getMetaById(editId);
+        if (oldMeta && oldMeta.anexoRegra) {
+          data.anexoRegra = oldMeta.anexoRegra;
         }
       }
-      const newMeta = DataStore.add(DataStore.KEYS.METAS, data);
-      DataStore.recalcMesesData(newMeta);
-      DataStore.update(DataStore.KEYS.METAS, newMeta.id, newMeta);
-      Components.toast('Meta criada com sucesso!', 'success');
-    }
-    Components.closeModal();
-    App.refreshPage();
+
+      if (file) {
+        if (typeof GraphAPI !== 'undefined') {
+          Components.toast('Fazendo upload do anexo da regra...', 'info');
+          const safeMetaTitle = data.titulo.replace(/[^a-zA-Z0-9 _-]/g, '').trim() || 'RegraMeta';
+          const extension = file.name.includes('.') ? file.name.split('.').pop() : '';
+          const newFileName = `Regra_${safeMetaTitle}_${Date.now()}.${extension}`;
+
+          try {
+            const graphData = await GraphAPI.uploadFile(newFileName, file, 'RegrasMetas');
+            data.anexoRegra = {
+              nome: newFileName,
+              url: graphData.webUrl || null,
+              downloadUrl: graphData.downloadUrl || null,
+              usuarioNome: Auth.getSession()?.nome || 'Admin',
+              dataHora: new Date().toISOString()
+            };
+          } catch (err) {
+            console.error("Erro no upload do anexo da regra", err);
+            Components.toast('Erro no upload do anexo. Salvando meta sem o novo anexo.', 'error');
+          }
+        }
+      }
+
+      // Processar campos extras (Composição e Compartilhamento)
+      if (data.tipo === 'composta') {
+        const composicao = [];
+        const rows = document.querySelectorAll('.composicao-row');
+        rows.forEach((row, i) => {
+          const metaId = row.querySelector('select').value;
+          const peso = parseFloat(row.querySelector('input[type="number"]').value) || 0;
+          if (metaId) composicao.push({ metaId, peso });
+        });
+
+        const totalPeso = composicao.reduce((s, c) => s + c.peso, 0);
+        if (totalPeso !== 100 && composicao.length > 0) {
+          Components.toast('A soma dos pesos da composição deve ser exatamente 100%!', 'error');
+          return;
+        }
+        data.composicao = composicao;
+
+        // Regra de Integridade: Zerar peso das metas filhas no sistema para evitar dupla contagem
+        let metasStore = DataStore.get(DataStore.KEYS.METAS);
+        let alterouFilhas = false;
+        composicao.forEach(c => {
+          const idx = metasStore.findIndex(x => x.id === c.metaId);
+          if (idx !== -1 && metasStore[idx].peso !== 0) {
+            metasStore[idx].peso = 0;
+            alterouFilhas = true;
+          }
+        });
+        if (alterouFilhas) {
+          DataStore.set(DataStore.KEYS.METAS, metasStore);
+          Components.toast('Pesos das metas individuais filhas foram ajustados para 0% para evitar duplicidade.', 'info');
+        }
+      } else if (data.tipo === 'compartilhada') {
+        const checkboxes = document.querySelectorAll('input[name="coresponsavel"]:checked');
+        data.coresponsavelIds = Array.from(checkboxes).map(cb => cb.value);
+      }
+
+      data.valorAlvo = valoresCurva['100'] || 0;
+      // We keep valorAtual as the accumulated R of the current month if existing
+
+      if (editId) {
+        const oldMeta = DataStore.getMetaById(editId);
+        if (oldMeta) {
+          data.mesesData = oldMeta.mesesData || [];
+          data.valorAtual = oldMeta.valorAtual;
+          if (oldMeta.composicao && !data.composicao) data.composicao = oldMeta.composicao;
+          if (oldMeta.refMetaId && !data.refMetaId) data.refMetaId = oldMeta.refMetaId;
+          if (oldMeta.refTipoOriginal && !data.refTipoOriginal) data.refTipoOriginal = oldMeta.refTipoOriginal;
+          DataStore.recalcMesesData(data);
+        }
+        DataStore.update(DataStore.KEYS.METAS, editId, data);
+        this.recalcParentMetas(editId);
+        this.syncResultToMirrors(editId); // Push curve and target value updates to all mirrors in Firebase
+        Components.toast('Meta atualizada com sucesso!', 'success');
+      } else {
+        data.valorAtual = 0;
+        // Usa o código da meta (ex: MET0100) como ID do documento no Firebase para facilitar a localização
+        if (data.codigo && data.codigo.trim()) {
+          data.id = data.codigo.trim().toUpperCase().replace(/\s+/g, '_');
+          // Garante unicidade: se já existir uma meta com esse ID, adiciona sufixo
+          const existing = DataStore.getMetas().find(m => m.id === data.id);
+          if (existing) {
+            data.id = data.id + '_' + Date.now().toString(36).substr(-4);
+          }
+        }
+        const newMeta = DataStore.add(DataStore.KEYS.METAS, data);
+        DataStore.recalcMesesData(newMeta);
+        DataStore.update(DataStore.KEYS.METAS, newMeta.id, newMeta);
+        Components.toast('Meta criada com sucesso!', 'success');
+      }
+      Components.closeModal();
+      App.refreshPage();
     } catch (err) {
       console.error("Erro ao salvar meta:", err);
       Components.toast('Ocorreu um erro ao salvar a meta. Verifique os dados e tente novamente.', 'error');
@@ -1075,7 +1075,7 @@ const Metas = {
     if (!td) return;
     const currentValue = td.dataset.value || '';
     const currentNa = td.dataset.na === 'true';
-    
+
     // Use a temporary flag to prevent blur from saving when button is clicked
     window._isNaClick = false;
 
@@ -1095,7 +1095,7 @@ const Metas = {
         </button>` : ''}
       </div>
     `;
-    
+
     const input = document.getElementById(`inlineInput_${tdId}`);
     if (input && !currentNa) input.focus();
   },
@@ -1105,7 +1105,7 @@ const Metas = {
     if (!td) return;
     const currentValue = td.dataset.value || '';
     const currentNa = td.dataset.na === 'true';
-    
+
     td.innerHTML = `
       <div class="matrix-inline-edit" title="Editar Valor" onclick="Metas.enableInlineEdit('${metaId}', '${mes}', '${tdId}', '${dataKey}', '${field}')" style="display:flex; align-items:center; justify-content:center; gap:6px;">
         <span>${currentNa ? '<span style="color: var(--text-3); font-weight: 600;">N/A</span>' : (currentValue || '<span style="color: var(--text-3);">-</span>')}</span>
@@ -1114,9 +1114,9 @@ const Metas = {
   },
 
   saveInlineResult(metaId, mes, valueStr, dataKey, field) {
-    const tdId = `cell_${metaId}_${dataKey}_${field}_${mes.replace(/\//g,'_')}`;
+    const tdId = `cell_${metaId}_${dataKey}_${field}_${mes.replace(/\//g, '_')}`;
     const td = document.getElementById(tdId);
-    
+
     if (valueStr === 'REMOVE_NA') {
       let metas = DataStore.getMetas();
       let m = metas.find(x => x.id === metaId);
@@ -1136,7 +1136,7 @@ const Metas = {
             this.syncResultToMirrors(metaId, mes);
           }
           Components.toast('N/A removido.', 'info');
-          App.refreshPage();
+          DataStore._hasPendingSync = true;
           setTimeout(() => Metas.openDetail(metaId), 100);
         }
       }
@@ -1178,11 +1178,11 @@ const Metas = {
       }
 
       Components.toast('Apontamento salvo como N/A.', 'success');
-      App.refreshPage();
+      DataStore._hasPendingSync = true;
       setTimeout(() => Metas.openDetail(metaId), 100);
       return;
     }
-    
+
     let valStr = valueStr.replace(/\./g, '').replace(',', '.');
     const val = parseFloat(valStr);
     if (isNaN(val)) {
@@ -1190,7 +1190,7 @@ const Metas = {
       this.cancelInlineEdit(metaId, mes, tdId, dataKey, field);
       return;
     }
-    
+
     let metas = DataStore.getMetas();
     let m = metas.find(x => x.id === metaId);
     if (!m) return;
@@ -1210,14 +1210,14 @@ const Metas = {
 
     // Sincronizar se for compartilhada: propaga para origem → origem propaga para todos os espelhos
     if (m.tipo === 'compartilhada' && m.refMetaId && field === 'r') {
-       this.syncResultToSource(m.refMetaId, mes, valueStr);
+      this.syncResultToSource(m.refMetaId, mes, valueStr);
     } else if (field === 'r') {
       // Origem: propaga resultado para todos os espelhos
       this.syncResultToMirrors(metaId, mes);
     }
 
     Components.toast('Valor salvo com sucesso.', 'success');
-    App.refreshPage();
+    DataStore._hasPendingSync = true;
     setTimeout(() => Metas.openDetail(metaId), 100);
   },
 
@@ -1234,51 +1234,51 @@ const Metas = {
   },
 
   syncResultToSource(sourceId, mes, valueStr) {
-     let metas = DataStore.getMetas();
-     const sourceIdx = metas.findIndex(x => String(x.id) === String(sourceId));
-     if (sourceIdx !== -1) {
-        const m = metas[sourceIdx];
-        let monthObj = m.mesesData ? m.mesesData.find(d => d.mes === mes) : null;
-        if (!monthObj) {
-           if (!m.mesesData) m.mesesData = [];
-           monthObj = { mes, pontual: { p: null, r: null, d: null, nota: null, na: false }, acumulado: { p: null, r: null, d: null, nota: null }, anexos: [] };
-           m.mesesData.push(monthObj);
-        }
-        
-        if (valueStr === null || valueStr === 'NA') {
-           monthObj.pontual.na = true;
-           monthObj.pontual.r = null;
-           } else if (valueStr === 'REMOVE_NA') {
-              monthObj.pontual.na = false;
-              monthObj.pontual.r = null;
-           } else {
-              monthObj.pontual.r = parseFloat(String(valueStr).replace(',', '.'));
-              monthObj.pontual.na = false;
-           }
-           DataStore.recalcMesesData(m);
-           DataStore.update(DataStore.KEYS.METAS, m.id, m);
-           // Recalcula hierarquia de metas compostas
-           this.recalcParentMetas(sourceId);
-           // Propaga o dado atualizado da origem para TODOS os espelhos
-           this.syncResultToMirrors(sourceId, mes);
-     }
+    let metas = DataStore.getMetas();
+    const sourceIdx = metas.findIndex(x => String(x.id) === String(sourceId));
+    if (sourceIdx !== -1) {
+      const m = metas[sourceIdx];
+      let monthObj = m.mesesData ? m.mesesData.find(d => d.mes === mes) : null;
+      if (!monthObj) {
+        if (!m.mesesData) m.mesesData = [];
+        monthObj = { mes, pontual: { p: null, r: null, d: null, nota: null, na: false }, acumulado: { p: null, r: null, d: null, nota: null }, anexos: [] };
+        m.mesesData.push(monthObj);
+      }
+
+      if (valueStr === null || valueStr === 'NA') {
+        monthObj.pontual.na = true;
+        monthObj.pontual.r = null;
+      } else if (valueStr === 'REMOVE_NA') {
+        monthObj.pontual.na = false;
+        monthObj.pontual.r = null;
+      } else {
+        monthObj.pontual.r = parseFloat(String(valueStr).replace(',', '.'));
+        monthObj.pontual.na = false;
+      }
+      DataStore.recalcMesesData(m);
+      DataStore.update(DataStore.KEYS.METAS, m.id, m);
+      // Recalcula hierarquia de metas compostas
+      this.recalcParentMetas(sourceId);
+      // Propaga o dado atualizado da origem para TODOS os espelhos
+      this.syncResultToMirrors(sourceId, mes);
+    }
   },
 
   syncResultToMirrors(sourceId, mes) {
-     // Encontra todos os espelhos que referenciam esta origem
-     let metas = DataStore.getMetas();
-     const mirrors = metas.filter(x => x.tipo === 'compartilhada' && String(x.refMetaId) === String(sourceId));
-     mirrors.forEach(mirror => {
-        if (!mirror.mesesData) return;
-        // recalcMesesData para espelhos copia automaticamente todos os dados da origem
-        DataStore.recalcMesesData(mirror);
-        DataStore.update(DataStore.KEYS.METAS, mirror.id, mirror);
-     });
+    // Encontra todos os espelhos que referenciam esta origem
+    let metas = DataStore.getMetas();
+    const mirrors = metas.filter(x => x.tipo === 'compartilhada' && String(x.refMetaId) === String(sourceId));
+    mirrors.forEach(mirror => {
+      if (!mirror.mesesData) return;
+      // recalcMesesData para espelhos copia automaticamente todos os dados da origem
+      DataStore.recalcMesesData(mirror);
+      DataStore.update(DataStore.KEYS.METAS, mirror.id, mirror);
+    });
   },
 
   openAnexoForm(metaId, mes) {
     Components.closeModal();
-    
+
     const meta = DataStore.getMetaById(metaId);
     let currentAnexos = [];
     if (meta && meta.mesesData) {
@@ -1337,11 +1337,11 @@ const Metas = {
           <textarea class="form-input form-textarea" name="descricao" rows="2" placeholder="Opcional..."></textarea>
         </div>
       </form>`;
-      
+
     const footer = `
       <button class="btn btn-ghost" onclick="Metas.openDetail('${metaId}')">Voltar</button>
       <button class="btn btn-primary" onclick="document.getElementById('anexoForm').requestSubmit()">Salvar Anexo</button>`;
-      
+
     setTimeout(() => Components.openModal(`Evidências — ${mes}`, content, footer), 350);
   },
 
@@ -1354,10 +1354,10 @@ const Metas = {
     }
     const fileName = file.name;
     const session = Auth.getSession() || {};
-    
+
     let metas = DataStore.getMetas();
     let m = metas.find(x => x.id === metaId);
-    
+
     // GATILHO: Se for meta compartilhada, salvar o anexo na meta de ORIGEM
     if (m && m.tipo === 'compartilhada' && m.refMetaId) {
       m = metas.find(x => x.id === m.refMetaId);
@@ -1373,17 +1373,17 @@ const Metas = {
       if (m.mesesData) {
         let monthObj = m.mesesData.find(x => x.mes === mes);
         if (monthObj) {
-           if (!monthObj.anexos) monthObj.anexos = [];
-           monthObj.anexos.push({ 
-             nome: finalFileName, 
-             url: fileData.webUrl || null, 
-             downloadUrl: fileData.downloadUrl || null,
-             usuarioNome: session.nome || session.id || 'Usuário Desconhecido',
-             dataHora: new Date().toISOString() 
-           });
+          if (!monthObj.anexos) monthObj.anexos = [];
+          monthObj.anexos.push({
+            nome: finalFileName,
+            url: fileData.webUrl || null,
+            downloadUrl: fileData.downloadUrl || null,
+            usuarioNome: session.nome || session.id || 'Usuário Desconhecido',
+            dataHora: new Date().toISOString()
+          });
         }
       }
-      
+
       DataStore.set(DataStore.KEYS.METAS, metas);
       Components.toast('Evidência salva com sucesso.', 'success');
       Components.closeModal();
@@ -1399,20 +1399,34 @@ const Metas = {
         };
         const mesKey = mes.split('/')[0].toUpperCase();
         const numMes = mesesMap[mesKey] || mesKey;
-        
+
         const extension = fileName.includes('.') ? fileName.split('.').pop() : '';
         const extStr = extension ? `.${extension}` : '';
-        
+
         const monthObj = m.mesesData ? m.mesesData.find(x => x.mes === mes) : null;
         const anexosCount = monthObj && monthObj.anexos ? monthObj.anexos.length : 0;
-        
+
         // Renomeia o arquivo para o número do mês (01.pdf). Se houver múltiplos, adiciona sufixo (01_2.pdf)
         const newFileName = anexosCount === 0 ? `${numMes}${extStr}` : `${numMes}_${anexosCount + 1}${extStr}`;
-        
+
         // Pasta baseada no nome da meta (removendo caracteres especiais que podem quebrar a URL do SharePoint)
         const safeMetaTitle = m.titulo.replace(/[^a-zA-Z0-9 _-]/g, '').trim() || 'Evidencias';
 
-        const graphData = await GraphAPI.uploadFile(newFileName, file, safeMetaTitle);
+        // Mapeamento de pastas restritas por diretoria (conforme regras do SharePoint)
+        const getSharePointFolderByArea = (areaId) => {
+          if (!areaId) return 'Metas_Financeiro';
+          const id = String(areaId);
+          if (id.startsWith('1.1')) return 'Metas_Comercial';
+          if (id.startsWith('1.2')) return 'Metas_Engenharia';
+          if (id.startsWith('1.3')) return 'Metas_Financeiro';
+          if (id.startsWith('1.4')) return 'Metas_Projetos';
+          return 'Metas_Financeiro'; // Corporativo e outras áreas caem no financeiro
+        };
+
+        const targetDir = getSharePointFolderByArea(m.areaId);
+        const subFolder = `${targetDir}/${safeMetaTitle}`;
+
+        const graphData = await GraphAPI.uploadFile(newFileName, file, subFolder);
         proceedWithSave(graphData, newFileName);
       } catch (error) {
         console.error("Erro no upload do Graph API:", error);
@@ -1426,7 +1440,7 @@ const Metas = {
   deleteAnexo(metaId, mes, index) {
     let metas = DataStore.getMetas();
     let m = metas.find(x => x.id === metaId);
-    
+
     if (m && m.tipo === 'compartilhada' && m.refMetaId) {
       m = metas.find(x => x.id === m.refMetaId);
       metaId = m.id;
@@ -1438,7 +1452,7 @@ const Metas = {
         monthObj.anexos.splice(index, 1);
       }
     }
-    
+
     DataStore.set(DataStore.KEYS.METAS, metas);
     Components.toast('Evidência excluída com sucesso.', 'info');
     Components.closeModal();
@@ -1506,7 +1520,7 @@ const Metas = {
     const session = Auth.getSession() || {};
     const isAdmin = session.id === 'admin' || session.nivel === 'Admin';
     const isEdit = !!acao;
-    
+
     // Regular users can only edit attachment if they are editing
     const disableFields = isEdit && !isAdmin;
 
@@ -1559,12 +1573,12 @@ const Metas = {
               <div style="display: flex; align-items: center; gap: 8px; font-size: 0.78rem;">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                 <span style="color: var(--text-3);">Criado em:</span>
-                <span style="color: var(--text-1);">${acao && acao.criadoEm ? new Date(acao.criadoEm).toLocaleString('pt-BR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : 'Não informado'}</span>
+                <span style="color: var(--text-1);">${acao && acao.criadoEm ? new Date(acao.criadoEm).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Não informado'}</span>
               </div>
               <div style="display: flex; align-items: center; gap: 8px; font-size: 0.78rem;">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                 <span style="color: var(--text-3);">Última atualização:</span>
-                <span style="color: var(--text-1);">${acao && acao.atualizadoEm ? new Date(acao.atualizadoEm).toLocaleString('pt-BR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : 'Não informado'}</span>
+                <span style="color: var(--text-1);">${acao && acao.atualizadoEm ? new Date(acao.atualizadoEm).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Não informado'}</span>
               </div>
             </div>
           </div>` : ''}
@@ -1585,10 +1599,10 @@ const Metas = {
     const data = Object.fromEntries(new FormData(e.target));
     const isEdit = !!acaoId;
     let acao = isEdit ? { ...DataStore.getById(DataStore.KEYS.ACOES, acaoId) } : {};
-    
+
     const session = Auth.getSession() || {};
     const isAdmin = session.id === 'admin' || session.nivel === 'Admin';
-    
+
     // GATILHO: Se for meta compartilhada, salvar a ação na meta de ORIGEM
     const meta = DataStore.getMetaById(metaId);
     const targetMetaId = (meta && meta.tipo === 'compartilhada' && meta.refMetaId) ? meta.refMetaId : metaId;
@@ -1609,22 +1623,22 @@ const Metas = {
       acao.criadoPorNome = session.nome || session.id;
     }
     acao.atualizadoEm = new Date().toISOString();
-    
+
     // Handle file attachment
     const file = document.getElementById('acaoFileInput').files[0];
-    
+
     const proceedSaveAcao = (fileData) => {
       if (fileData) {
-        acao.anexo = { 
-          nome: fileData.nome, 
-          url: fileData.url || null, 
+        acao.anexo = {
+          nome: fileData.nome,
+          url: fileData.url || null,
           data: new Date().toISOString(),
           dataHora: new Date().toISOString(),
           usuarioId: session.id,
           usuarioNome: session.nome
         };
       }
-      
+
       if (isEdit) {
         DataStore.update(DataStore.KEYS.ACOES, acaoId, acao);
         Components.toast('Ação atualizada com sucesso!', 'success');
@@ -1641,12 +1655,12 @@ const Metas = {
       if (isFirebaseActive && storage) {
         const storageRef = storage.ref(`acoes/${targetMetaId}_${Date.now()}_${file.name}`);
         const uploadTask = storageRef.put(file);
-        uploadTask.on('state_changed', null, 
+        uploadTask.on('state_changed', null,
           (error) => {
             console.error("Erro no upload do Firebase Storage:", error);
             Components.toast('Falha ao subir arquivo. Salvando apenas offline.', 'warning');
             proceedSaveAcao({ nome: file.name, url: null });
-          }, 
+          },
           () => {
             uploadTask.snapshot.ref.getDownloadURL().then((downloadURL) => {
               proceedSaveAcao({ nome: file.name, url: downloadURL });
@@ -1668,7 +1682,7 @@ const Metas = {
       acao.progresso = newProgress;
       acao.atualizadoEm = new Date().toISOString();
       DataStore.update(DataStore.KEYS.ACOES, acaoId, acao);
-      
+
       let statusAuto = 'nao_iniciada';
       if (newProgress === 100) statusAuto = 'concluida';
       else if (newProgress > 0) statusAuto = 'em_andamento';

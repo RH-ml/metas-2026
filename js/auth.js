@@ -3,12 +3,12 @@
 // ============================================
 
 const msalConfig = {
-    auth: {
-        clientId: "1349995e-48d5-4f58-be87-c19d90593b07", // ID do Aplicativo
-        // Acesso restrito ao diretório da Moura Leite (Tenant ID configurado)
-        authority: "https://login.microsoftonline.com/34bf99e3-12de-4814-ab19-0d0f90fab15b",
-        redirectUri: window.location.origin + window.location.pathname
-    }
+  auth: {
+    clientId: "1349995e-48d5-4f58-be87-c19d90593b07", // ID do Aplicativo
+    // Acesso restrito ao diretório da Moura Leite (Tenant ID configurado)
+    authority: "https://login.microsoftonline.com/34bf99e3-12de-4814-ab19-0d0f90fab15b",
+    redirectUri: window.location.origin + window.location.pathname
+  }
 };
 
 const msalInstance = new msal.PublicClientApplication(msalConfig);
@@ -141,7 +141,7 @@ const Auth = {
       };
 
       const response = await msalInstance.loginPopup(loginRequest);
-      
+
       const emailMicrosoft = response.account.username;
 
       // Verifica se o usuário existe no DataStore do sistema
@@ -149,14 +149,14 @@ const Auth = {
       const userNoSistema = users.find(u => u.email.toLowerCase() === emailMicrosoft.toLowerCase());
 
       if (userNoSistema) {
-        const session = { 
-          id: userNoSistema.id, 
-          nome: userNoSistema.nome, 
-          email: userNoSistema.email, 
-          cargo: userNoSistema.cargo, 
-          area: userNoSistema.area, 
-          nivel: userNoSistema.nivel, 
-          avatar: userNoSistema.avatar 
+        const session = {
+          id: userNoSistema.id,
+          nome: userNoSistema.nome,
+          email: userNoSistema.email,
+          cargo: userNoSistema.cargo,
+          area: userNoSistema.area,
+          nivel: userNoSistema.nivel,
+          avatar: userNoSistema.avatar
         };
         localStorage.setItem('mp_session', JSON.stringify(session));
         localStorage.removeItem('metas_filter_area');

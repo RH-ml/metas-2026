@@ -6,7 +6,7 @@ const GraphAPI = {
   // Configurações do SharePoint extraídas do link fornecido
   siteUrl: "mouraleite1.sharepoint.com",
   sitePath: "/sites/BancodeDados",
-  baseFolderPath: "/Metas_2026",
+  baseFolderPath: "/Metas 2026",
   listName: "", // Deixando em branco, ele usará a biblioteca padrão "Documentos"
   resolvedSiteId: null, // Cache para o Site ID real resolvida no getSiteId()
   resolvedDriveId: null, // Cache para o Drive ID da biblioteca de destino
@@ -18,20 +18,20 @@ const GraphAPI = {
    */
   async getSiteId() {
     if (this.resolvedSiteId) return this.resolvedSiteId;
-    
+
     const token = await this.getToken();
     if (!token) throw new Error("Usuário não autenticado no Microsoft Graph");
-    
+
     const url = `https://graph.microsoft.com/v1.0/sites/${this.siteUrl}:${this.sitePath}`;
     const response = await fetch(url, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
-    
+
     if (!response.ok) {
       const err = await response.text();
       throw new Error(`Erro ao resolver Site ID (${response.status}): ${err}`);
     }
-    
+
     const data = await response.json();
     this.resolvedSiteId = data.id;
     return this.resolvedSiteId;
@@ -42,19 +42,19 @@ const GraphAPI = {
    */
   async getDriveId() {
     if (this.resolvedDriveId) return this.resolvedDriveId;
-    
+
     const siteId = await this.getSiteId();
     const token = await this.getToken();
     if (!token) throw new Error("Usuário não autenticado no Microsoft Graph");
-    
+
     if (!this.listName) {
-       // Pega o drive padrão (Documentos) do site
-       const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/drive`;
-       const response = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
-       if (!response.ok) throw new Error("Erro ao acessar biblioteca padrão.");
-       const data = await response.json();
-       this.resolvedDriveId = data.id;
-       return this.resolvedDriveId;
+      // Pega o drive padrão (Documentos) do site
+      const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/drive`;
+      const response = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+      if (!response.ok) throw new Error("Erro ao acessar biblioteca padrão.");
+      const data = await response.json();
+      this.resolvedDriveId = data.id;
+      return this.resolvedDriveId;
     }
 
     // Tenta primeiro obter a lista pelo nome e pegar o drive associado
@@ -74,19 +74,19 @@ const GraphAPI = {
     const response = await fetch(url, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
-    
+
     if (!response.ok) {
       const err = await response.text();
       throw new Error(`Erro ao listar bibliotecas (${response.status}): ${err}`);
     }
-    
+
     const data = await response.json();
     const drive = data.value.find(d => d.name === this.listName || (d.webUrl && d.webUrl.includes(this.listName)));
-    
+
     if (!drive) {
       throw new Error(`Biblioteca '${this.listName}' não encontrada no site.`);
     }
-    
+
     this.resolvedDriveId = drive.id;
     return this.resolvedDriveId;
   },
@@ -100,7 +100,7 @@ const GraphAPI = {
       console.error("MSAL não inicializado");
       return null;
     }
-    
+
     let accounts = instance.getAllAccounts();
     if (accounts.length === 0) {
       console.warn("Nenhuma conta Microsoft ativa encontrada no MSAL. Tentando autenticação via popup...");
@@ -115,9 +115,9 @@ const GraphAPI = {
         return null;
       }
     }
-    
+
     if (accounts.length === 0) return null;
-    
+
     const request = {
       scopes: ["Sites.ReadWrite.All", "Files.ReadWrite.All", "User.Read"],
       account: accounts[0]
@@ -149,14 +149,14 @@ const GraphAPI = {
   async uploadFile(fileName, fileBlob, subFolder = "") {
     const token = await this.getToken();
     if (!token) throw new Error("Usuário não autenticado no Microsoft Graph");
-    
+
     const driveId = await this.getDriveId();
     const folderPath = subFolder ? `${this.baseFolderPath}/${subFolder}` : this.baseFolderPath;
-    
+
     // Escapar caracteres especiais no caminho e nome do arquivo (ex: espaços, parênteses como "(9)") para evitar erros no parser do OData/Graph API
     const escapedFolder = folderPath.split('/').map(seg => encodeURIComponent(seg)).join('/');
     const escapedFileName = encodeURIComponent(fileName);
-    
+
     // Graph API endpoint acessando diretamente o Drive específico (biblioteca) resolvido
     const url = `https://graph.microsoft.com/v1.0/drives/${driveId}/root:${escapedFolder}/${escapedFileName}:/content`;
 
@@ -173,7 +173,7 @@ const GraphAPI = {
       const err = await response.text();
       throw new Error(`Erro no upload (${response.status}): ${err}`);
     }
-    
+
     const data = await response.json();
     return {
       webUrl: data.webUrl,
@@ -187,19 +187,19 @@ const GraphAPI = {
   async downloadDatabase() {
     const token = await this.getToken();
     if (!token) return null;
-    
+
     try {
       const driveId = await this.getDriveId();
       // Escapar caracteres especiais no caminho do banco de dados no SharePoint
       const escapedFolder = this.baseFolderPath.split('/').map(seg => encodeURIComponent(seg)).join('/');
       const url = `https://graph.microsoft.com/v1.0/drives/${driveId}/root:${escapedFolder}/banco_de_dados.json:/content`;
-      
+
       const response = await fetch(url, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.status === 404) {
         console.log("Banco de dados não encontrado no SharePoint (primeiro uso).");
-        return null; 
+        return null;
       }
       if (!response.ok) throw new Error(`Erro ao baixar DB: ${response.statusText}`);
       return await response.json();
