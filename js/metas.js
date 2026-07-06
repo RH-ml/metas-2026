@@ -1408,17 +1408,27 @@ const Metas = {
 
         // Mapeamento de pastas restritas por diretoria (conforme regras do SharePoint)
         const getSharePointFolderByArea = (areaId, responsavelId) => {
-          let id = areaId;
-          if (!id && responsavelId) {
-            const respArea = DataStore.getAreaAtual(responsavelId);
-            if (respArea) id = respArea.id;
+          let codigo = null;
+          
+          if (areaId) {
+            const area = DataStore.getAreaById(areaId);
+            if (area && area.codigo) codigo = area.codigo;
+            else codigo = String(areaId);
           }
-          if (!id) return 'Metas_Financeiro';
-          id = String(id);
-          if (id.startsWith('1.1')) return 'Metas_Comercial';
-          if (id.startsWith('1.2')) return 'Metas_Engenharia';
-          if (id.startsWith('1.3')) return 'Metas_Financeiro';
-          if (id.startsWith('1.4')) return 'Metas_Projetos';
+          
+          if (!codigo && responsavelId) {
+            const respArea = DataStore.getAreaAtual(responsavelId);
+            if (respArea && respArea.codigo) codigo = respArea.codigo;
+          }
+
+          if (!codigo) return 'Metas_Financeiro';
+          
+          codigo = String(codigo);
+          if (codigo.startsWith('1.1')) return 'Metas_Comercial';
+          if (codigo.startsWith('1.2')) return 'Metas_Engenharia';
+          if (codigo.startsWith('1.3')) return 'Metas_Financeiro';
+          if (codigo.startsWith('1.4')) return 'Metas_Projetos';
+          
           return 'Metas_Financeiro'; // Corporativo e outras áreas caem no financeiro
         };
 
