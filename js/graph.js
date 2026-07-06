@@ -7,7 +7,7 @@ const GraphAPI = {
   siteUrl: "mouraleite1.sharepoint.com",
   sitePath: "/sites/BancodeDados",
   baseFolderPath: "/Metas 2026",
-  listName: "", // Deixando em branco, ele usará a biblioteca padrão "Documentos"
+  listName: "Documentos Compartilhados", // Garantir que está buscando na biblioteca correta
   resolvedSiteId: null, // Cache para o Site ID real resolvida no getSiteId()
   resolvedDriveId: null, // Cache para o Drive ID da biblioteca de destino
 
@@ -170,8 +170,15 @@ const GraphAPI = {
     });
 
     if (!response.ok) {
-      const err = await response.text();
-      throw new Error(`Erro no upload (${response.status}): ${err}`);
+      const errText = await response.text();
+      let errMsg = errText;
+      try {
+        const errJson = JSON.parse(errText);
+        if (errJson.error && errJson.error.message) {
+          errMsg = `${errJson.error.code}: ${errJson.error.message}`;
+        }
+      } catch (e) {}
+      throw new Error(`Erro no upload (${response.status}): ${errMsg} | URL: ${url}`);
     }
 
     const data = await response.json();

@@ -1328,8 +1328,7 @@ const DataStore = {
     const mult = regras.find(r => r.tipo === 'multiplicador' && r.nivel === user.nivel);
     const teto = regras.find(r => r.tipo === 'teto');
 
-    let pesoTotal = metas.reduce((s, m) => s + m.peso, 0);
-    let perfPonderada = pesoTotal > 0 ? metas.reduce((s, m) => s + (this.calcPerformance(m) * m.peso), 0) / pesoTotal : 0;
+    let perfPonderada = metas.length > 0 ? metas.reduce((s, m) => s + ((this.calcPerformance(m) * m.peso) / 100), 0) : 0;
 
     const elegivel = perfPonderada >= (gatilho ? gatilho.valor : 80);
     const multiplicador = mult ? mult.valor : 1;

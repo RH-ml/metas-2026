@@ -1407,9 +1407,14 @@ const Metas = {
         const safeMetaTitle = m.titulo.replace(/[^a-zA-Z0-9 _-]/g, '').trim() || 'Evidencias';
 
         // Mapeamento de pastas restritas por diretoria (conforme regras do SharePoint)
-        const getSharePointFolderByArea = (areaId) => {
-          if (!areaId) return 'Metas_Financeiro';
-          const id = String(areaId);
+        const getSharePointFolderByArea = (areaId, responsavelId) => {
+          let id = areaId;
+          if (!id && responsavelId) {
+            const respArea = DataStore.getAreaAtual(responsavelId);
+            if (respArea) id = respArea.id;
+          }
+          if (!id) return 'Metas_Financeiro';
+          id = String(id);
           if (id.startsWith('1.1')) return 'Metas_Comercial';
           if (id.startsWith('1.2')) return 'Metas_Engenharia';
           if (id.startsWith('1.3')) return 'Metas_Financeiro';
@@ -1417,7 +1422,7 @@ const Metas = {
           return 'Metas_Financeiro'; // Corporativo e outras áreas caem no financeiro
         };
 
-        const targetDir = getSharePointFolderByArea(m.areaId);
+        const targetDir = getSharePointFolderByArea(m.areaId, m.responsavelId);
         const subFolder = `${targetDir}/${safeMetaTitle}`;
 
         const graphData = await GraphAPI.uploadFile(newFileName, file, subFolder);

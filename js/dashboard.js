@@ -226,8 +226,7 @@ const Dashboard = {
     // Corporate section — exclui compartilhadas do painel corporativo
     const corpMetas = metas.filter(m => m.tipo === 'corporativa');
     const gatilhos = metas.filter(m => m.isGatilho === true && m.tipo !== 'compartilhada');
-    const corpPesoTotal = corpMetas.reduce((s, m) => s + (parseFloat(m.peso) || 0), 0);
-    const corpPerf = corpPesoTotal > 0 ? corpMetas.reduce((s, m) => s + ((DataStore.calcPerformance(m) || 0) * (parseFloat(m.peso) || 0)), 0) / corpPesoTotal : 0;
+    const corpPerf = corpMetas.length > 0 ? corpMetas.reduce((s, m) => s + (((DataStore.calcPerformance(m) || 0) * (parseFloat(m.peso) || 0)) / 100), 0) : 0;
 
     // Area section — usa a mesma lógica de getFilteredMetas() do módulo Metas
     let areaMetas = [];
@@ -270,15 +269,10 @@ const Dashboard = {
       return p !== null && m.valorAtual !== null;
     });
 
-    const areaPesoTotal = areaMatasParaCalc.reduce((s, m) => {
+    const areaPerf = areaMatasParaCalc.length > 0 ? areaMatasParaCalc.reduce((s, m) => {
       const pesoEfetivo = childIds.has(m.id) || m.tipo === 'compartilhada' ? 0 : (parseFloat(m.peso) || 0);
-      return s + pesoEfetivo;
-    }, 0);
-
-    const areaPerf = areaPesoTotal > 0 ? areaMatasParaCalc.reduce((s, m) => {
-      const pesoEfetivo = childIds.has(m.id) || m.tipo === 'compartilhada' ? 0 : (parseFloat(m.peso) || 0);
-      return s + ((DataStore.calcPerformance(m) || 0) * pesoEfetivo);
-    }, 0) / areaPesoTotal : 0;
+      return s + (((DataStore.calcPerformance(m) || 0) * pesoEfetivo) / 100);
+    }, 0) : 0;
     
     const totalArea = areaMetas.length;
     let verdes = 0, laranjas = 0, vermelhas = 0;
