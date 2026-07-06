@@ -7,7 +7,7 @@ const GraphAPI = {
   siteUrl: "mouraleite1.sharepoint.com",
   sitePath: "/sites/BancodeDados",
   baseFolderPath: "/Metas 2026",
-  listName: "Documentos Compartilhados", // Garantir que está buscando na biblioteca correta
+  listName: "", // Deixando em branco, ele usará a biblioteca padrão "Documentos"
   resolvedSiteId: null, // Cache para o Site ID real resolvida no getSiteId()
   resolvedDriveId: null, // Cache para o Drive ID da biblioteca de destino
 
