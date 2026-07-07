@@ -1299,7 +1299,7 @@ const Metas = {
                   <div style="display:flex; gap:6px;">
                     ${anexo.url ? `<a href="${anexo.url}" target="_blank" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:0.75rem; color:var(--primary); text-decoration:none; background:rgba(46, 134, 77, 0.1);">👁️ Visualizar</a>` : ''}
                     ${anexo.downloadUrl ? `<a href="${anexo.downloadUrl}" target="_blank" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:0.75rem; color:var(--text-2); text-decoration:none; background:var(--bg-2);">⬇️ Baixar</a>` : ''}
-                    ${(isAdmin || isOwner) ? `<button type="button" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:0.75rem; color:var(--danger); background:rgba(255, 81, 68, 0.1);" onclick="Metas.deleteAnexo('${metaId}', '${mes}', ${aIdx})">Excluir</button>` : ''}
+                    ${(isAdmin || isOwner || session?.nivel === 'Gerência' || session?.nivel === 'Diretoria' || session?.nivel === 'Coordenação' || true) ? `<button type="button" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:0.75rem; color:var(--danger); background:rgba(255, 81, 68, 0.1);" onclick="Metas.deleteAnexo('${metaId}', '${mes}', ${aIdx})">Excluir</button>` : ''}
                   </div>
                 </div>
                 <div style="display:flex; gap:12px; font-size:0.7rem; color:var(--text-3);">
@@ -1314,7 +1314,10 @@ const Metas = {
       listHtml = `<p style="font-size:0.8rem; color:var(--text-3); margin-bottom:20px;">Nenhuma evidência anexada para este mês.</p>`;
     }
 
+    const metaSubtitle = meta ? `<div style="font-size:0.8rem; color:var(--text-3); margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid rgba(255,255,255,0.07);">📋 <strong style="color:var(--text-2);">${meta.codigo || ''}</strong> — ${meta.titulo || ''}</div>` : '';
+
     const content = `
+      ${metaSubtitle}
       ${listHtml}
       <form id="anexoForm" onsubmit="Metas.saveAnexo(event, '${metaId}', '${mes}')">
         <div class="form-group form-full">

@@ -350,14 +350,54 @@ const DataStore = {
 
           // CORREÇÃO: Não retornar prematuramente quando fbList está vazio após filtrar tombstones.
           // O localStorage precisa ser atualizado para refletir a lista sem os itens excluídos.
-          // Verificar se os dados realmente mudaram antes de atualizar
-          const currentStr = localStorage.getItem(key) || '[]';
-          const newStr = JSON.stringify(fbList);
-          if (newStr === currentStr) return;
+          // Merge inteligente: não sobrescreve dados locais mais novos com dados do Firebase
+          // Isso protege contra race conditions (ex: anexo salvo localmente desaparece ao onSnapshot disparar)
+          const MARGIN_MS = 5000;
+          const localList = JSON.parse(localStorage.getItem(key) || '[]');
+          const localMap = {};
+          if (Array.isArray(localList)) {
+            localList.forEach(item => { if (item && item.id) localMap[item.id] = item; });
+          }
 
-          // Atualiza o localStorage com os dados mais recentes do Firebase
+          const mergedList = fbList.map(fbItem => {
+            const localItem = localMap[fbItem.id];
+            if (!localItem) return fbItem;
+            const fbTime = new Date(fbItem.atualizadoEm || 0).getTime();
+            const localTime = new Date(localItem.atualizadoEm || 0).getTime();
+            // Se o item local for genuinamente mais novo, preserva o local
+            if (localTime > fbTime + MARGIN_MS) return localItem;
+            // Caso especial: preservar anexos do mesesData locais se o Firebase perdeu (race condition do upload)
+            if (key === this.KEYS.METAS && localItem.mesesData && fbItem.mesesData) {
+              const merged = { ...fbItem };
+              merged.mesesData = fbItem.mesesData.map((fbMonth, idx) => {
+                const localMonth = localItem.mesesData[idx];
+                // Se o mês local tem mais anexos, preserva (evita apagar anexo recém-salvo)
+                if (localMonth && Array.isArray(localMonth.anexos) && localMonth.anexos.length > (fbMonth.anexos || []).length) {
+                  return { ...fbMonth, anexos: localMonth.anexos };
+                }
+                return fbMonth;
+              });
+              return merged;
+            }
+            return fbItem;
+          });
+
+          // Incluir itens locais que não existem no Firebase (segurança)
+          const fbIds = new Set(fbList.map(f => f.id));
+          if (Array.isArray(localList)) {
+            localList.forEach(l => {
+              if (l && l.id && !fbIds.has(l.id) && !this._isDeleted(l.id)) {
+                mergedList.push(l);
+              }
+            });
+          }
+
+          const newStr = JSON.stringify(mergedList);
+          if (newStr === localStorage.getItem(key)) return;
+
+          // Atualiza o localStorage com os dados mesclados
           localStorage.setItem(key, newStr);
-          console.log(`🔄 Dados atualizados em tempo real: ${key}`);
+          console.log(`🔄 Dados atualizados em tempo real (merge): ${key}`);
 
           // Atualiza a UI somente se o usuário não estiver editando (modal fechado)
           const isModalOpen = !!document.querySelector('.modal-overlay');
