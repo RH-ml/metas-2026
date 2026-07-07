@@ -318,6 +318,21 @@ const Metas = {
   openDetail(id) {
     const meta = DataStore.getMetaById(id);
     if (!meta) return;
+
+    // Mescla os anexos do localStorage bruto para garantir que evidências recém-salvas apareçam
+    const rawMetasForAnexos = DataStore.get(DataStore.KEYS.METAS);
+    let rawForAnexo = rawMetasForAnexos.find(x => x.id === id);
+    if (rawForAnexo && rawForAnexo.tipo === 'compartilhada' && rawForAnexo.refMetaId) {
+      rawForAnexo = rawMetasForAnexos.find(x => x.id === rawForAnexo.refMetaId);
+    }
+    if (rawForAnexo && rawForAnexo.mesesData && meta.mesesData) {
+      meta.mesesData.forEach((m, idx) => {
+        if (rawForAnexo.mesesData[idx]) {
+          m.anexos = rawForAnexo.mesesData[idx].anexos || [];
+        }
+      });
+    }
+
     const acoes = DataStore.getAcoesByMeta(meta.id);
     const format = val => (val === null || val === undefined) ? 'N/A' : (meta.unidade === 'R$' ? Components.formatCurrency(val) : Components.formatNumber(val));
     const formatPerc = val => (val === null || val === undefined) ? 'N/A' : Components.formatNumber(val) + '%';
@@ -1273,10 +1288,22 @@ const Metas = {
   openAnexoForm(metaId, mes) {
     Components.closeModal();
 
+    // Lê diretamente do localStorage bruto — NUNCA via getMetas() que pode perder os anexos
+    const rawMetas = DataStore.get(DataStore.KEYS.METAS);
+    let rawMeta = rawMetas.find(x => x.id === metaId);
+
+    // Resolve compartilhada → busca os anexos na meta de ORIGEM
+    if (rawMeta && rawMeta.tipo === 'compartilhada' && rawMeta.refMetaId) {
+      const origin = rawMetas.find(x => x.id === rawMeta.refMetaId);
+      if (origin) rawMeta = origin;
+    }
+
+    // Usa dados processados apenas para exibição (nome, código, etc)
     const meta = DataStore.getMetaById(metaId);
+
     let currentAnexos = [];
-    if (meta && meta.mesesData) {
-      const monthObj = meta.mesesData.find(x => x.mes === mes);
+    if (rawMeta && rawMeta.mesesData) {
+      const monthObj = rawMeta.mesesData.find(x => x.mes === mes);
       if (monthObj && monthObj.anexos) {
         currentAnexos = monthObj.anexos;
       }
@@ -1390,6 +1417,8 @@ const Metas = {
             dataHora: new Date().toISOString()
           });
           rawM.atualizadoEm = new Date().toISOString();
+          // TRAVA: Bloqueia o onSnapshot de sobrescrever o localStorage por 10 segundos
+          DataStore._recentAnexoSave = Date.now();
           // Salva direto no localStorage e Firebase
           localStorage.setItem(DataStore.KEYS.METAS, JSON.stringify(rawMetas));
           if (typeof db !== 'undefined' && db) {
@@ -1480,6 +1509,7 @@ const Metas = {
       if (monthObj && monthObj.anexos) {
         monthObj.anexos.splice(index, 1);
         rawM.atualizadoEm = new Date().toISOString();
+        DataStore._recentAnexoSave = Date.now();
         localStorage.setItem(DataStore.KEYS.METAS, JSON.stringify(rawMetas));
         if (typeof db !== 'undefined' && db) {
           db.collection(DataStore.KEYS.METAS).doc(rawM.id).set(JSON.parse(JSON.stringify(rawM)))

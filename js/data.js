@@ -350,6 +350,16 @@ const DataStore = {
 
           // CORREÇÃO: Não retornar prematuramente quando fbList está vazio após filtrar tombstones.
           // O localStorage precisa ser atualizado para refletir a lista sem os itens excluídos.
+
+          // TRAVA ANTI-RACE-CONDITION: Se um anexo foi salvo nos últimos 10 segundos,
+          // ignora completamente a atualização do Firebase para METAS.
+          // Isso impede que o onSnapshot (que dispara milissegundos após o set())
+          // sobrescreva o localStorage com dados antigos do Firebase antes da confirmação.
+          if (key === this.KEYS.METAS && this._recentAnexoSave && (Date.now() - this._recentAnexoSave) < 10000) {
+            console.log('🛡️ onSnapshot ignorado para METAS — proteção de anexo recente ativo');
+            return;
+          }
+
           // Merge inteligente: não sobrescreve dados locais mais novos com dados do Firebase
           // Isso protege contra race conditions (ex: anexo salvo localmente desaparece ao onSnapshot disparar)
           const MARGIN_MS = 5000;
