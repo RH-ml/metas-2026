@@ -70,13 +70,13 @@ const Metas = {
             </div>
             <div class="form-group" style="margin: 0; min-width: 150px;">
               <label style="display: block; font-size: 0.75rem; color: var(--text-3); margin-bottom: 4px; font-weight: 600;">Competência</label>
-              <select class="tree-dropdown-trigger" style="height: 40px; appearance: none; outline: none; background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2218%22%20height%3D%2218%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%234b5563%22%20stroke-width%3D%222%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22/%3E%3C/svg%3E'); background-repeat: no-repeat; background-position: right 14px center; padding-right: 40px;" onchange="Metas.setCompetencia(this.value)">
+              <select class="tree-dropdown-trigger" style="height: 34px; appearance: none; outline: none; background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2218%22%20height%3D%2218%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%234b5563%22%20stroke-width%3D%222%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22/%3E%3C/svg%3E'); background-repeat: no-repeat; background-position: right 14px center; padding-right: 40px;" onchange="Metas.setCompetencia(this.value)">
                 ${mesesFiltro.map((m, idx) => `<option value="${idx}" ${this.currentCompetencia === idx ? 'selected' : ''}>${m}</option>`).join('')}
               </select>
             </div>
             <div class="form-group" style="margin: 0; min-width: 150px;">
               <label style="display: block; font-size: 0.75rem; color: var(--text-3); margin-bottom: 4px; font-weight: 600;">Ordenar por</label>
-              <select class="tree-dropdown-trigger" style="height: 40px; appearance: none; outline: none; background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2218%22%20height%3D%2218%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%234b5563%22%20stroke-width%3D%222%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22/%3E%3C/svg%3E'); background-repeat: no-repeat; background-position: right 14px center; padding-right: 40px;" onchange="Metas.setSort(this.value)">
+              <select class="tree-dropdown-trigger" style="height: 34px; appearance: none; outline: none; background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2218%22%20height%3D%2218%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%234b5563%22%20stroke-width%3D%222%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22/%3E%3C/svg%3E'); background-repeat: no-repeat; background-position: right 14px center; padding-right: 40px;" onchange="Metas.setSort(this.value)">
                 <option value="peso" ${this.currentSort === 'peso' ? 'selected' : ''}>Peso (Maior primeiro)</option>
                 <option value="az" ${this.currentSort === 'az' ? 'selected' : ''}>Ordem Alfabética (A-Z)</option>
               </select>

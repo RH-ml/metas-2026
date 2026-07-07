@@ -368,7 +368,7 @@ const Components = {
 
     return `
       <div class="tree-dropdown-wrap" id="tree-selector-wrap">
-        <div class="tree-dropdown-trigger" style="height: 40px; box-sizing: border-box;" onclick="Components.toggleTreeSelector()">
+        <div class="tree-dropdown-trigger" style="height: 34px; box-sizing: border-box;" onclick="Components.toggleTreeSelector()">
           <span>${label}</span>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
         </div>
