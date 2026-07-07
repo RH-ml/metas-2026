@@ -1378,7 +1378,7 @@ const Metas = {
         }
       }
 
-      DataStore.set(DataStore.KEYS.METAS, metas);
+      DataStore.update(DataStore.KEYS.METAS, m.id, m);
       Components.toast('Evidência salva com sucesso.', 'success');
       Components.closeModal();
       App.refreshPage();
@@ -1459,10 +1459,10 @@ const Metas = {
       let monthObj = m.mesesData.find(x => x.mes === mes);
       if (monthObj && monthObj.anexos) {
         monthObj.anexos.splice(index, 1);
+        DataStore.update(DataStore.KEYS.METAS, m.id, m);
       }
     }
 
-    DataStore.set(DataStore.KEYS.METAS, metas);
     Components.toast('Evidência excluída com sucesso.', 'info');
     Components.closeModal();
     App.refreshPage();
