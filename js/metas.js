@@ -391,7 +391,7 @@ const Metas = {
     const meses = meta.mesesData || [];
     const session = Auth.getSession() || {};
     const isAdmin = session.id === 'admin' || session.nivel === 'Admin';
-    const isOwner = session.id === meta.responsavelId || (Array.isArray(meta.coresponsavelIds) && meta.coresponsavelIds.includes(session.id));
+    const isOwner = session.id === meta.responsavelId || (Array.isArray(meta.coresponsavelIds) && meta.coresponsavelIds.includes(session.id)) || (typeof DataStore.isUserApoioDaArea === 'function' && DataStore.isUserApoioDaArea(session.id, meta.areaId));
 
     const getMatrixFieldValue = (m, dataKey, field) => {
       const monthData = m[dataKey] || {};
@@ -1361,7 +1361,7 @@ const Metas = {
 
     const session = Auth.getSession();
     const isAdmin = session?.nivel === 'Admin';
-    const isOwner = session?.id === meta?.responsavelId;
+    const isOwner = session?.id === meta?.responsavelId || (Array.isArray(meta?.coresponsavelIds) && meta.coresponsavelIds.includes(session?.id)) || (typeof DataStore.isUserApoioDaArea === 'function' && DataStore.isUserApoioDaArea(session?.id, meta?.areaId));
 
     let listHtml = '';
     if (currentAnexos.length > 0) {

@@ -343,6 +343,9 @@ const Configuracoes = {
     const areas = DataStore.getAuthorizedAreas();
     const isEdit = !!area;
     const effectiveParent = isEdit ? area.parentId : parentId;
+    
+    const users = DataStore.getUsers().filter(u => u.ativo).sort((a,b) => a.nome.localeCompare(b.nome));
+    const apoioIds = area && area.apoioIds ? area.apoioIds : [];
 
     const content = `
       <form id="areaForm" onsubmit="Configuracoes.saveArea(event, '${editId || ''}')">
@@ -365,6 +368,13 @@ const Configuracoes = {
             </select>
             <small class="form-hint">A Diretoria vê todas sub-áreas. Gerências veem apenas a própria área.</small>
           </div>
+          <div class="form-group form-full">
+            <label class="form-label">Apoio da Área / Digitadores (Opcional)</label>
+            <select class="form-input" name="apoioIds" multiple style="height: 100px;">
+              ${users.map(u => `<option value="${u.id}" ${apoioIds.includes(u.id) ? 'selected' : ''}>${u.nome} (${u.cargo || 'Sem cargo'})</option>`).join('')}
+            </select>
+            <small class="form-hint">Segure Ctrl (ou Cmd) para selecionar múltiplos. Usuários listados aqui terão permissão de editar resultados e evidências de <strong>todas</strong> as metas desta área.</small>
+          </div>
         </div>
       </form>`;
 
@@ -377,8 +387,10 @@ const Configuracoes = {
 
   saveArea(e, editId) {
     e.preventDefault();
-    const data = Object.fromEntries(new FormData(e.target));
+    const formData = new FormData(e.target);
+    const data = Object.fromEntries(formData);
     data.parentId = data.parentId || null;
+    data.apoioIds = formData.getAll('apoioIds'); // Captura array de selections múltiplas
 
     if (editId) {
       DataStore.update(DataStore.KEYS.AREAS, editId, data);

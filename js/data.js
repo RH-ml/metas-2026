@@ -1321,24 +1321,49 @@ const DataStore = {
     return roots.map(buildNode);
   },
 
+  // Helper: check if a user is Apoio for an area
+  isUserApoioDaArea(userId, areaId) {
+    if (!userId || !areaId) return false;
+    const area = this.getAreaById(areaId);
+    return area && area.apoioIds && Array.isArray(area.apoioIds) && area.apoioIds.includes(userId);
+  },
+
   getAuthorizedAreas() {
     const session = Auth.getSession() || {};
     const rootId = Auth.getUserRootAreaId();
-    if (rootId === 'all') return this.getAreas();
-    if (!rootId) return [];
+    
+    // Todas as áreas do banco
+    const allAreas = this.getAreas();
 
-    // Área própria + sub-áreas
-    const visibleIds = this.getVisibleAreaIds(rootId);
+    if (rootId === 'all') return allAreas;
 
-    // Para Diretoria: adicionar também a área pai (corporativa)
-    if (session.nivel === 'Diretoria') {
-      const ownArea = this.getAreaById(rootId);
-      if (ownArea && ownArea.parentId && !visibleIds.includes(ownArea.parentId)) {
-        visibleIds.unshift(ownArea.parentId);
+    const authorized = new Set();
+
+    // 1. Área própria + sub-áreas (Hierarquia normal)
+    if (rootId) {
+      const visibleIds = this.getVisibleAreaIds(rootId);
+      
+      // Para Diretoria: adicionar também a área pai (corporativa)
+      if (session.nivel === 'Diretoria') {
+        const ownArea = this.getAreaById(rootId);
+        if (ownArea && ownArea.parentId && !visibleIds.includes(ownArea.parentId)) {
+          visibleIds.unshift(ownArea.parentId);
+        }
       }
+      
+      visibleIds.forEach(id => authorized.add(id));
     }
 
-    return this.getAreas().filter(a => visibleIds.includes(a.id));
+    // 2. Áreas de Apoio (Digitador) - o usuário ganha acesso a qualquer área que o inclua como Apoio
+    allAreas.forEach(a => {
+      if (a.apoioIds && Array.isArray(a.apoioIds) && a.apoioIds.includes(session.id)) {
+        authorized.add(a.id);
+        // Opcional: Permitir que ele veja a área e as sub-áreas daquela que ele é apoio
+        // this.getVisibleAreaIds(a.id).forEach(subId => authorized.add(subId));
+      }
+    });
+
+    return allAreas.filter(a => authorized.has(a.id));
   },
 
   getAuthorizedAreaTree() {
