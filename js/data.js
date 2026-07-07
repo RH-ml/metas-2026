@@ -443,10 +443,10 @@ const DataStore = {
   },
 
   _showSyncNotification() {
-    // Toast discreto informando que os dados foram atualizados por outro usuário
-    if (typeof Components !== 'undefined' && Components.toast) {
-      Components.toast('🔄 Dados atualizados por outro usuário.', 'info', 2500);
-    }
+    // Toast discreto desativado a pedido do usuário
+    // if (typeof Components !== 'undefined' && Components.toast) {
+    //   Components.toast('🔄 Dados atualizados por outro usuário.', 'info', 2500);
+    // }
   },
 
   // Sincronização forçada: puxar TUDO do Firebase agora, sem anti-amnésia.

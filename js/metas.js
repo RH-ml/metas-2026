@@ -12,10 +12,17 @@ const Metas = {
     const d = new Date();
     return (d.getMonth() === 0) ? 11 : d.getMonth() - 1;
   })(),
+  currentSort: localStorage.getItem('metas_filter_sort') || 'peso',
 
   setCompetencia(value) {
     this.currentCompetencia = parseInt(value, 10);
     localStorage.setItem('metas_filter_competencia', this.currentCompetencia);
+    App.refreshPage();
+  },
+
+  setSort(value) {
+    this.currentSort = value;
+    localStorage.setItem('metas_filter_sort', this.currentSort);
     App.refreshPage();
   },
 
@@ -63,8 +70,15 @@ const Metas = {
             </div>
             <div class="form-group" style="margin: 0; min-width: 150px;">
               <label style="display: block; font-size: 0.75rem; color: var(--text-3); margin-bottom: 4px; font-weight: 600;">Competência</label>
-              <select class="tree-dropdown-trigger" style="appearance: none; outline: none; background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2218%22%20height%3D%2218%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%234b5563%22%20stroke-width%3D%222%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22/%3E%3C/svg%3E'); background-repeat: no-repeat; background-position: right 14px center; padding-right: 40px;" onchange="Metas.setCompetencia(this.value)">
+              <select class="tree-dropdown-trigger" style="height: 40px; appearance: none; outline: none; background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2218%22%20height%3D%2218%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%234b5563%22%20stroke-width%3D%222%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22/%3E%3C/svg%3E'); background-repeat: no-repeat; background-position: right 14px center; padding-right: 40px;" onchange="Metas.setCompetencia(this.value)">
                 ${mesesFiltro.map((m, idx) => `<option value="${idx}" ${this.currentCompetencia === idx ? 'selected' : ''}>${m}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group" style="margin: 0; min-width: 150px;">
+              <label style="display: block; font-size: 0.75rem; color: var(--text-3); margin-bottom: 4px; font-weight: 600;">Ordenar por</label>
+              <select class="tree-dropdown-trigger" style="height: 40px; appearance: none; outline: none; background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2218%22%20height%3D%2218%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%234b5563%22%20stroke-width%3D%222%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22/%3E%3C/svg%3E'); background-repeat: no-repeat; background-position: right 14px center; padding-right: 40px;" onchange="Metas.setSort(this.value)">
+                <option value="peso" ${this.currentSort === 'peso' ? 'selected' : ''}>Peso (Maior primeiro)</option>
+                <option value="az" ${this.currentSort === 'az' ? 'selected' : ''}>Ordem Alfabética (A-Z)</option>
               </select>
             </div>
           </div>
@@ -261,8 +275,13 @@ const Metas = {
     });
     metas = filtered;
 
-    // --- Ordenação por Peso (maior primeiro) ---
-    metas.sort((a, b) => (b.peso || 0) - (a.peso || 0));
+    // --- Ordenação (Peso ou A-Z) ---
+    if (this.currentSort === 'az') {
+      metas.sort((a, b) => (a.titulo || '').localeCompare(b.titulo || ''));
+    } else {
+      // Peso (padrão)
+      metas.sort((a, b) => (b.peso || 0) - (a.peso || 0));
+    }
 
     // --- Agrupamento respeitando a ordem de peso ---
     // Percorre a lista já ordenada por peso. Quando encontra uma composta,
