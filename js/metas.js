@@ -283,14 +283,32 @@ const Metas = {
       metas.sort((a, b) => (b.peso || 0) - (a.peso || 0));
     }
 
-    // --- Agrupamento respeitando a ordem de peso ---
-    // Percorre a lista já ordenada por peso. Quando encontra uma composta,
-    // insere suas filhas logo abaixo — sem forçar compostas para o topo.
+    // Identificar quais metas são filhas de compostas PRESENTES na lista atual
+    const childIdsToSkip = new Set();
+    metas.forEach(m => {
+      if (m.tipo === 'composta' && Array.isArray(m.composicao)) {
+        m.composicao.forEach(comp => {
+          let filha = metas.find(x => String(x.id) === String(comp.metaId));
+          if (!filha) {
+            filha = metas.find(x => x.tipo === 'compartilhada' && String(x.refMetaId) === String(comp.metaId));
+          }
+          if (filha) {
+            childIdsToSkip.add(filha.id);
+          }
+        });
+      }
+    });
+
+    // --- Agrupamento respeitando a ordem ---
     const orderedMetas = [];
     const addedIds = new Set();
 
     metas.forEach(m => {
       if (addedIds.has(m.id)) return; // filha já inserida abaixo da sua composta
+      
+      // Se é filha de uma composta que também está na lista, pula por enquanto
+      // Ela será renderizada no momento em que iterarmos a mãe dela.
+      if (childIdsToSkip.has(m.id)) return;
 
       if (m.tipo === 'composta') {
         m.isSubMeta = false;
@@ -299,16 +317,29 @@ const Metas = {
 
         // Insere as filhas imediatamente abaixo da composta
         if (Array.isArray(m.composicao)) {
+          // Coleta as filhas
+          const filhas = [];
           m.composicao.forEach(comp => {
             let filha = metas.find(x => String(x.id) === String(comp.metaId));
             if (!filha) {
               filha = metas.find(x => x.tipo === 'compartilhada' && String(x.refMetaId) === String(comp.metaId));
             }
             if (filha && !addedIds.has(filha.id)) {
-              filha.isSubMeta = true;
-              orderedMetas.push(filha);
-              addedIds.add(filha.id);
+              filhas.push(filha);
             }
+          });
+
+          // Se estiver em ordem alfabética, ordena as filhas também para manter a consistência
+          if (this.currentSort === 'az') {
+            filhas.sort((a, b) => (a.titulo || '').localeCompare(b.titulo || ''));
+          } else {
+            filhas.sort((a, b) => (b.peso || 0) - (a.peso || 0));
+          }
+
+          filhas.forEach(filha => {
+            filha.isSubMeta = true;
+            orderedMetas.push(filha);
+            addedIds.add(filha.id);
           });
         }
       } else {
