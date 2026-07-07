@@ -1370,28 +1370,21 @@ const DataStore = {
     const session = Auth.getSession() || {};
     const rootId = Auth.getUserRootAreaId();
     if (rootId === 'all') return this.buildAreaTree();
-    if (!rootId) return [];
-
+    
     const areas = this.getAuthorizedAreas();
+    if (areas.length === 0) return [];
+
     const buildNode = (area) => ({
       ...area,
       children: areas.filter(a => a.parentId === area.id).map(buildNode)
     });
 
-    // Para Diretoria: exibir árvore como [corporativa → [sua diretoria → [sub-áreas]]]
-    if (session.nivel === 'Diretoria') {
-      const ownArea = this.getAreaById(rootId);
-      if (ownArea && ownArea.parentId) {
-        const corporateArea = this.getAreaById(ownArea.parentId);
-        if (corporateArea) {
-          const ownNode = buildNode(ownArea);
-          return [{ ...corporateArea, children: [ownNode] }];
-        }
-      }
-    }
-
-    const rootArea = areas.find(a => a.id === rootId);
-    return rootArea ? [buildNode(rootArea)] : [];
+    // Encontra todos os "roots" virtuais (áreas às quais o usuário tem acesso, 
+    // mas não tem acesso à área pai correspondente)
+    const areaIds = new Set(areas.map(a => a.id));
+    const virtualRoots = areas.filter(a => !a.parentId || !areaIds.has(a.parentId));
+    
+    return virtualRoots.map(buildNode);
   },
 
   calcBonusColaborador(userId) {
