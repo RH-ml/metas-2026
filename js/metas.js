@@ -1367,8 +1367,19 @@ const Metas = {
     Components.toast('Fazendo upload da evidência para o SharePoint...', 'info');
 
     const proceedWithSave = (fileData, finalFileName) => {
-      if (m.mesesData) {
-        let monthObj = m.mesesData.find(x => x.mes === mes);
+      // Lê diretamente do localStorage bruto para evitar race conditions com dados computados
+      const rawMetas = DataStore.get(DataStore.KEYS.METAS);
+      let rawMetaId = metaId;
+
+      // Resolve meta de origem se for compartilhada
+      let rawM = rawMetas.find(x => x.id === rawMetaId);
+      if (rawM && rawM.tipo === 'compartilhada' && rawM.refMetaId) {
+        rawMetaId = rawM.refMetaId;
+        rawM = rawMetas.find(x => x.id === rawMetaId);
+      }
+
+      if (rawM && rawM.mesesData) {
+        let monthObj = rawM.mesesData.find(x => x.mes === mes);
         if (monthObj) {
           if (!monthObj.anexos) monthObj.anexos = [];
           monthObj.anexos.push({
@@ -1378,10 +1389,15 @@ const Metas = {
             usuarioNome: session.nome || session.id || 'Usuário Desconhecido',
             dataHora: new Date().toISOString()
           });
+          rawM.atualizadoEm = new Date().toISOString();
+          // Salva direto no localStorage e Firebase
+          localStorage.setItem(DataStore.KEYS.METAS, JSON.stringify(rawMetas));
+          if (typeof db !== 'undefined' && db) {
+            db.collection(DataStore.KEYS.METAS).doc(rawM.id).set(JSON.parse(JSON.stringify(rawM)))
+              .catch(e => console.error('Erro ao salvar anexo no Firebase:', e));
+          }
         }
       }
-
-      DataStore.update(DataStore.KEYS.METAS, m.id, m);
       Components.toast('Evidência salva com sucesso.', 'success');
       Components.closeModal();
       App.refreshPage();
@@ -1450,19 +1466,25 @@ const Metas = {
   },
 
   deleteAnexo(metaId, mes, index) {
-    let metas = DataStore.getMetas();
-    let m = metas.find(x => x.id === metaId);
+    // Lê diretamente do localStorage bruto para evitar race conditions
+    const rawMetas = DataStore.get(DataStore.KEYS.METAS);
+    let rawM = rawMetas.find(x => x.id === metaId);
 
-    if (m && m.tipo === 'compartilhada' && m.refMetaId) {
-      m = metas.find(x => x.id === m.refMetaId);
-      metaId = m.id;
+    if (rawM && rawM.tipo === 'compartilhada' && rawM.refMetaId) {
+      rawM = rawMetas.find(x => x.id === rawM.refMetaId);
+      metaId = rawM ? rawM.id : metaId;
     }
 
-    if (m && m.mesesData) {
-      let monthObj = m.mesesData.find(x => x.mes === mes);
+    if (rawM && rawM.mesesData) {
+      let monthObj = rawM.mesesData.find(x => x.mes === mes);
       if (monthObj && monthObj.anexos) {
         monthObj.anexos.splice(index, 1);
-        DataStore.update(DataStore.KEYS.METAS, m.id, m);
+        rawM.atualizadoEm = new Date().toISOString();
+        localStorage.setItem(DataStore.KEYS.METAS, JSON.stringify(rawMetas));
+        if (typeof db !== 'undefined' && db) {
+          db.collection(DataStore.KEYS.METAS).doc(rawM.id).set(JSON.parse(JSON.stringify(rawM)))
+            .catch(e => console.error('Erro ao excluir anexo no Firebase:', e));
+        }
       }
     }
 
