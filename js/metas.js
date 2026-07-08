@@ -1633,6 +1633,7 @@ const Metas = {
     const acao = acaoId ? DataStore.getById(DataStore.KEYS.ACOES, acaoId) : null;
     const session = Auth.getSession() || {};
     const isAdmin = session.id === 'admin' || session.nivel === 'Admin';
+    const isGestor = isAdmin || session.nivel === 'Gerência' || session.nivel === 'Diretoria' || session.nivel === 'Coordenação';
     const isEdit = !!acao;
 
     // Regular users can only edit attachment if they are editing
@@ -1663,10 +1664,21 @@ const Metas = {
           <div class="form-group form-full">
             <label class="form-label">Anexo</label>
             ${acao && acao.anexo && acao.anexo.nome ? `
-              <div style="margin-bottom: 8px; font-size: 0.8rem; background: var(--bg-3); padding: 8px; border-radius: 4px;">
-                <strong>Anexo atual:</strong> ${acao.anexo.url ? `<a href="${acao.anexo.url}" target="_blank">${acao.anexo.nome}</a>` : acao.anexo.nome}
-                ${acao.anexo.usuarioNome ? `<div style="font-size: 0.7rem; color: var(--text-3); margin-top: 4px;">Anexado por ${acao.anexo.usuarioNome} em ${new Date(acao.anexo.dataHora || acao.anexo.data).toLocaleString('pt-BR')}</div>` : ''}
+              <div style="display:flex; flex-direction:column; background:var(--bg-3); padding:12px; border-radius:var(--radius-sm); border: 1px solid rgba(255,255,255,0.05); gap: 8px; margin-bottom: 12px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <span style="font-size:0.85rem; color:var(--text-1); font-weight:500; word-break:break-all;">📎 ${acao.anexo.nome}</span>
+                  <div style="display:flex; gap:6px; flex-shrink:0;">
+                    ${acao.anexo.url ? `<a href="${acao.anexo.url}" target="_blank" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:0.75rem; color:var(--primary); text-decoration:none; background:rgba(46, 134, 77, 0.1);">👁️ Visualizar</a>` : ''}
+                    ${acao.anexo.downloadUrl ? `<a href="${acao.anexo.downloadUrl}" target="_blank" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:0.75rem; color:var(--text-2); text-decoration:none; background:var(--bg-2);">⬇️ Baixar</a>` : (acao.anexo.url ? `<a href="${acao.anexo.url}" download class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:0.75rem; color:var(--text-2); text-decoration:none; background:var(--bg-2);">⬇️ Baixar</a>` : '')}
+                    <button type="button" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:0.75rem; color:var(--danger); background:rgba(255, 81, 68, 0.1);" onclick="Metas.deleteAnexoAcao('${acaoId}', '${metaId}')">Excluir</button>
+                  </div>
+                </div>
+                <div style="display:flex; gap:12px; font-size:0.7rem; color:var(--text-3);">
+                  <span>👤 ${acao.anexo.usuarioNome || 'Não registrado'}</span>
+                  <span>🕒 ${new Date(acao.anexo.dataHora || acao.anexo.data || Date.now()).toLocaleString('pt-BR')}</span>
+                </div>
               </div>
+              <div style="font-size:0.75rem; color:var(--text-3); margin-bottom:6px;">Substituir anexo:</div>
             ` : ''}
             <div style="border: 2px dashed rgba(255,255,255,0.2); padding: 20px; text-align: center; border-radius: var(--radius-sm); cursor: pointer;" onclick="document.getElementById('acaoFileInput').click()">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" style="margin-bottom: 8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -1701,7 +1713,7 @@ const Metas = {
 
     const footer = `
       <button class="btn btn-ghost" onclick="Metas.openDetail('${metaId}')">Cancelar</button>
-      ${isEdit && isAdmin ? `<button class="btn btn-danger" onclick="Metas.deleteAcao('${acaoId}', '${metaId}')">Excluir</button>` : ''}
+      ${isEdit && isGestor ? `<button class="btn btn-danger" onclick="Metas.deleteAcao('${acaoId}', '${metaId}')">Excluir</button>` : ''}
       <button class="btn btn-primary" onclick="document.getElementById('acaoForm').requestSubmit()">${isEdit ? 'Salvar Alterações' : 'Criar Ação'}</button>`;
 
     Components.closeModal();
@@ -1815,5 +1827,17 @@ const Metas = {
     Components.toast('Ação excluída.', 'info');
     Components.closeModal();
     setTimeout(() => Metas.openDetail(metaId), 350);
+  },
+
+  deleteAnexoAcao(acaoId, metaId) {
+    if (!confirm('Deseja remover o anexo desta ação?')) return;
+    const acao = DataStore.getById(DataStore.KEYS.ACOES, acaoId);
+    if (!acao) return;
+    delete acao.anexo;
+    acao.atualizadoEm = new Date().toISOString();
+    DataStore.update(DataStore.KEYS.ACOES, acaoId, acao);
+    Components.toast('Anexo removido.', 'info');
+    Components.closeModal();
+    setTimeout(() => Metas.openAcaoForm(metaId, acaoId), 350);
   }
 };
