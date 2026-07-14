@@ -39,25 +39,23 @@ const Metas = {
     if (isAreaSelected) {
       metas = this.getFilteredMetas();
 
-      // Calcula notas globais baseadas nas metas filtradas e competência atual
-      const validMetas = metas.filter(m => {
-        const p = DataStore.calcPerformance(m, false, this.currentCompetencia);
-        return p !== null;
-      });
-
-      // Identificar metas que são filhas de metas compostas para ignorar seu peso individual
+      // Identifica filhas de metas compostas para ignorar seu peso individual
       const childIds = new Set();
-      validMetas.forEach(m => {
+      metas.forEach(m => {
         if (m.tipo === 'composta' && Array.isArray(m.composicao)) {
           m.composicao.forEach(c => childIds.add(c.metaId));
         }
       });
 
-      notaGlobal = validMetas.length > 0 ? validMetas.reduce((s, m) => {
-        const p = DataStore.calcPerformance(m, false, this.currentCompetencia);
+      // Nota Global = soma exata das Notas Ponderadas exibidas na tabela
+      notaGlobal = metas.reduce((s, m) => {
         const pesoEfetivo = childIds.has(m.id) || m.tipo === 'compartilhada' ? 0 : (m.peso || 0);
-        return s + ((p * pesoEfetivo) / 100);
-      }, 0) : null;
+        if (pesoEfetivo === 0) return s;
+        const p = DataStore.calcPerformance(m, false, this.currentCompetencia);
+        const notaPond = ((p !== null ? p : 0) * pesoEfetivo) / 100;
+        return s + notaPond;
+      }, 0);
+
     }
 
     return `
@@ -1469,8 +1467,8 @@ const Metas = {
           rawM.atualizadoEm = new Date().toISOString();
           // TRAVA: Bloqueia o onSnapshot de sobrescrever o localStorage por 10 segundos
           DataStore._recentAnexoSave = Date.now();
-          // Salva direto no localStorage e Firebase
-          localStorage.setItem(DataStore.KEYS.METAS, JSON.stringify(rawMetas));
+          // Salva direto no localStorage e Firebase (com compressão para economizar espaço)
+          localStorage.setItem(DataStore.KEYS.METAS, JSON.stringify(DataStore._compressMetaList(rawMetas)));
           if (typeof db !== 'undefined' && db) {
             db.collection(DataStore.KEYS.METAS).doc(rawM.id).set(JSON.parse(JSON.stringify(rawM)))
               .catch(e => console.error('Erro ao salvar anexo no Firebase:', e));
@@ -1560,7 +1558,7 @@ const Metas = {
         monthObj.anexos.splice(index, 1);
         rawM.atualizadoEm = new Date().toISOString();
         DataStore._recentAnexoSave = Date.now();
-        localStorage.setItem(DataStore.KEYS.METAS, JSON.stringify(rawMetas));
+        localStorage.setItem(DataStore.KEYS.METAS, JSON.stringify(DataStore._compressMetaList(rawMetas)));
         if (typeof db !== 'undefined' && db) {
           db.collection(DataStore.KEYS.METAS).doc(rawM.id).set(JSON.parse(JSON.stringify(rawM)))
             .catch(e => console.error('Erro ao excluir anexo no Firebase:', e));
