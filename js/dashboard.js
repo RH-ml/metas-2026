@@ -256,7 +256,7 @@ const Dashboard = {
       areaMetas = [];
     }
 
-    // Ignorar peso das metas filhas de compostas e das compartilhadas no cálculo da nota global
+    // Ignorar peso das metas filhas de compostas no cálculo da nota global
     const childIds = new Set();
     areaMetas.forEach(m => {
       if (m.tipo === 'composta' && Array.isArray(m.composicao)) {
@@ -270,7 +270,7 @@ const Dashboard = {
     });
 
     const areaPerf = areaMatasParaCalc.length > 0 ? areaMatasParaCalc.reduce((s, m) => {
-      const pesoEfetivo = childIds.has(m.id) || m.tipo === 'compartilhada' ? 0 : (parseFloat(m.peso) || 0);
+      const pesoEfetivo = childIds.has(m.id) ? 0 : (parseFloat(m.peso) || 0);
       return s + (((DataStore.calcPerformance(m) || 0) * pesoEfetivo) / 100);
     }, 0) : 0;
     

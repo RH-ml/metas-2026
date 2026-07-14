@@ -49,7 +49,7 @@ const Metas = {
 
       // Nota Global = soma exata das Notas Ponderadas exibidas na tabela
       notaGlobal = metas.reduce((s, m) => {
-        const pesoEfetivo = childIds.has(m.id) || m.tipo === 'compartilhada' ? 0 : (m.peso || 0);
+        const pesoEfetivo = childIds.has(m.id) ? 0 : (m.peso || 0);
         if (pesoEfetivo === 0) return s;
         const p = DataStore.calcPerformance(m, false, this.currentCompetencia);
         const notaPond = ((p !== null ? p : 0) * pesoEfetivo) / 100;
