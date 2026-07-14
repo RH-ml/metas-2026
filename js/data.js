@@ -508,7 +508,7 @@ const DataStore = {
                 this._showSyncNotification();
                 App.refreshPage();
               }
-            }, 600);
+            }, 1500);
           } else if (isModalOpen) {
             // Modal aberto: marca que há dados pendentes para atualizar ao fechar
             this._hasPendingSync = true;

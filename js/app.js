@@ -91,15 +91,39 @@ const App = {
         ${Components.renderSidebar(route)}
         <main class="main-content">
           ${Components.renderHeader(title, subtitle, showSearch)}
-          ${pageContent}
+          <div id="page-content-root">
+            ${pageContent}
+          </div>
         </main>
       </div>`;
 
     Components.animateProgressBars();
   },
 
+  // Extrai apenas o conteúdo da página (sem layout) — usado pelo refreshPage()
+  _getPageContent(route) {
+    switch (route) {
+      case 'dashboard':     return Dashboard.render();
+      case 'metas':         return Metas.render();
+      case 'remuneracao':   return Remuneracao.render();
+      case 'relatorios':    return Relatorios.render();
+      case 'lembretes':     return Lembretes.render();
+      case 'configuracoes': return Configuracoes.render();
+      default: return '<div class="page-content"><h2>Página não encontrada</h2></div>';
+    }
+  },
+
+  // Atualiza apenas o conteúdo interno da página — sem recriar sidebar/header.
+  // Elimina o piscar causado pela substituição completa do DOM a cada sync do Firebase.
   refreshPage() {
-    this.renderPage(this.currentRoute);
+    const contentRoot = document.getElementById('page-content-root');
+    if (contentRoot) {
+      contentRoot.innerHTML = this._getPageContent(this.currentRoute);
+      Components.animateProgressBars();
+    } else {
+      // Fallback: render completo (ex: primeira carga, transição de rota)
+      this.renderPage(this.currentRoute);
+    }
   }
 };
 
