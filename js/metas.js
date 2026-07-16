@@ -1381,6 +1381,7 @@ const Metas = {
                   <span>👤 ${anexo.usuarioNome || 'Não registrado'}</span>
                   <span>🕒 ${new Date(anexo.dataHora || anexo.data || Date.now()).toLocaleString('pt-BR')}</span>
                 </div>
+                ${anexo.descricao ? `<div style="font-size:0.78rem; color:var(--text-2); background:rgba(255,255,255,0.04); border-radius:4px; padding:6px 10px; border-left:2px solid var(--primary);">💬 ${anexo.descricao}</div>` : ''}
               </div>
             `).join('')}
           </div>
@@ -1425,6 +1426,7 @@ const Metas = {
       return;
     }
     const fileName = file.name;
+    const descricaoAnexo = (document.querySelector('#anexoForm textarea[name="descricao"]')?.value || '').trim();
     const session = Auth.getSession() || {};
 
     let metas = DataStore.getMetas();
@@ -1462,7 +1464,8 @@ const Metas = {
             url: fileData.webUrl || null,
             downloadUrl: fileData.downloadUrl || null,
             usuarioNome: session.nome || session.id || 'Usuário Desconhecido',
-            dataHora: new Date().toISOString()
+            dataHora: new Date().toISOString(),
+            descricao: descricaoAnexo || null
           });
           rawM.atualizadoEm = new Date().toISOString();
           // TRAVA: Bloqueia o onSnapshot de sobrescrever o localStorage por 10 segundos
