@@ -225,6 +225,11 @@ const Metas = {
 
     // 2. Filtro de Área Selecionada (this.currentArea)
     if (this.currentArea && this.currentArea !== 'todas' && this.currentArea !== 'all') {
+      // FIX v9b: Pré-carrega objeto da área selecionada para fallback por nome/código.
+      // Browsers diferentes podem ter IDs distintos no localStorage para a mesma área real
+      // (quando uma área foi recriada ou o anti-amnésia manteve um ID antigo).
+      const _selectedArea = DataStore.getAreaById(this.currentArea);
+
       areaMetas = areaMetas.filter(m => {
         // Para metas compartilhadas COM corresponsáveis: verificar se algum corresponsável pertence a esta área
         if (m.tipo === 'compartilhada' && Array.isArray(m.coresponsavelIds) && m.coresponsavelIds.length > 0) {
@@ -236,7 +241,7 @@ const Metas = {
           // Continua para verificar areaId e responsavelId abaixo
         }
 
-        // Para todos os tipos: verificar areaId salvo na meta
+        // Para todos os tipos: verificar areaId salvo na meta (match exato por ID)
         if (m.areaId === this.currentArea) {
           return true;
         }
@@ -244,8 +249,20 @@ const Metas = {
         // Verificar área atual do responsável
         if (m.responsavelId) {
           const respArea = DataStore.getAreaAtual(m.responsavelId);
-          if (respArea && respArea.id === this.currentArea) {
-            return true;
+          if (respArea) {
+            // Verificação primária: match por ID
+            if (respArea.id === this.currentArea) {
+              return true;
+            }
+            // FIX v9b: Fallback por nome + código — cobre o caso em que a área foi
+            // recriada com novo ID (browsers com localStorage antigo mantêm IDs diferentes).
+            // Exige AMBOS nome e código iguais para evitar match acidental entre áreas distintas.
+            if (_selectedArea &&
+                respArea.nome && _selectedArea.nome &&
+                respArea.nome.trim() === _selectedArea.nome.trim() &&
+                String(respArea.codigo || '').trim() === String(_selectedArea.codigo || '').trim()) {
+              return true;
+            }
           }
         }
 
