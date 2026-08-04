@@ -363,6 +363,46 @@ const DataStore = {
       localStorage.setItem(MIGRATION_KEY_V8, new Date().toISOString());
     }
 
+    // -----------------------------------------------------------------------
+    // Migração v9: Corrigir areaId de metas com ID de área desatualizado
+    // Garante que o Firebase tenha sempre o areaId correto para cada meta,
+    // evitando a "guerra de versões" entre browsers via mecanismo anti-amnésia.
+    // -----------------------------------------------------------------------
+    const MIGRATION_KEY_V9 = 'mp_migration_areaid_v9';
+    if (!localStorage.getItem(MIGRATION_KEY_V9)) {
+      try {
+        console.log('🔧 Migração v9 — corrigindo areaId das metas no Firebase...');
+        const metasV9 = this.get(this.KEYS.METAS) || [];
+        let updatedV9 = 0;
+        metasV9.forEach(m => {
+          if (!m.responsavelId || !m.id) return;
+          const areaObj = this.getAreaAtual(m.responsavelId);
+          if (!areaObj) return;
+          // Só atualiza se o areaId armazenado divergir do correto
+          if (m.areaId !== areaObj.id) {
+            m.areaId = areaObj.id;
+            updatedV9++;
+            // Persiste a correção no Firebase para que todos os browsers recebam via onSnapshot
+            if (typeof db !== 'undefined' && db) {
+              const cleanMeta = JSON.parse(JSON.stringify(m));
+              cleanMeta.atualizadoEm = new Date().toISOString();
+              db.collection(this.KEYS.METAS).doc(m.id).set(cleanMeta)
+                .catch(e => console.warn(`Migração v9: erro ao corrigir meta ${m.id}:`, e));
+            }
+          }
+        });
+        if (updatedV9 > 0) {
+          this.set(this.KEYS.METAS, metasV9);
+          console.log(`✅ Migração v9 concluída: ${updatedV9} meta(s) com areaId corrigido.`);
+        } else {
+          console.log('✅ Migração v9: nenhuma meta precisou de correção.');
+        }
+      } catch (errV9) {
+        console.warn('Migração v9 falhou (não crítico):', errV9);
+      }
+      localStorage.setItem(MIGRATION_KEY_V9, new Date().toISOString());
+    }
+
     // Inicia sincronizacao em tempo real para manter todos os usuarios sincronizados
     this.startRealtimeSync();
   },
@@ -898,15 +938,17 @@ const DataStore = {
         m.valorAlvo = parseFloat(m.valoresCurva['100']) || 0;
       }
       
-      // Resolve a área atual do responsável APENAS SE a meta não possuir areaId salva,
-      // ou para garantir integridade caso a meta perca sua área.
-      // O usuário pode ter metas associadas a áreas diferentes do seu setor atual.
-      if (!m.areaId && m.responsavelId) {
+      // FIX v9: Resolve a área do responsável SEMPRE em memória, independente do que
+      // está persistido no Firebase. Isso garante que o filtro de área no painel funcione
+      // corretamente mesmo que o areaId no Firebase esteja desatualizado ou ausente
+      // (ex: área recriada com novo ID, meta editada sem persistir areaId, ou browsers
+      // com versões locais antigas sobrescrevendo o Firebase via mecanismo anti-amnésia).
+      if (m.responsavelId) {
         const areaObj = this.getAreaAtual(m.responsavelId);
         if (areaObj) {
-          m.areaId = areaObj.id; // ✅ Fonte principal: historico_areas
-        } else {
-          // Fallback: busca o areaId direto no cadastro do usuário
+          m.areaId = areaObj.id; // ✅ Sempre sincronizado com o histórico de áreas
+        } else if (!m.areaId) {
+          // Fallback: somente se não tiver nenhum areaId, tenta o cadastro do usuário
           const user = this.getUserById(m.responsavelId);
           if (user && user.areaId) {
             m.areaId = user.areaId;

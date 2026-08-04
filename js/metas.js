@@ -1086,6 +1086,17 @@ const Metas = {
       data.valorAlvo = valoresCurva['100'] || 0;
       // We keep valorAtual as the accumulated R of the current month if existing
 
+      // FIX v9: Resolve e persiste o areaId correto antes de salvar no Firebase.
+      // O formulário não possui campo areaId, então sem esta linha o campo ficaria
+      // ausente/desatualizado no Firebase, causando a "guerra de versões" entre browsers:
+      // qualquer browser com cache local mais recente sobrescreveria o dado correto.
+      if (data.responsavelId) {
+        const areaAtualObj = DataStore.getAreaAtual(data.responsavelId);
+        if (areaAtualObj) {
+          data.areaId = areaAtualObj.id;
+        }
+      }
+
       if (editId) {
         const oldMeta = DataStore.getMetaById(editId);
         if (oldMeta) {
