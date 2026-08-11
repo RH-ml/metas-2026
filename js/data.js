@@ -558,7 +558,63 @@ const DataStore = {
         });
       });
 
+      // ─────────────────────────────────────────────────────────────────────
+      // Listener de TOMBSTONES em tempo real
+      // Quando qualquer browser deleta um registro (DataStore.remove), ele cria
+      // um tombstone no Firebase. Este listener garante que TODOS os browsers
+      // conectados recebam o tombstone imediatamente, evitando a "ressureição"
+      // de dados excluídos pela lógica anti-amnésia (item local não existe no
+      // Firebase → browser empurra de volta). Com o tombstone registrado localmente,
+      // o check _isDeleted() bloqueia a restauração.
+      // ─────────────────────────────────────────────────────────────────────
+      db.collection(this.TOMBSTONES_FB).onSnapshot(snapshot => {
+        let localUpdated = false;
+        snapshot.docChanges().forEach(change => {
+          if (change.type !== 'added' && change.type !== 'modified') return;
+          const data = change.doc.data();
+          if (!data || !data.id) return;
+
+          // Só processa se este browser ainda não conhece o tombstone
+          if (this._isDeleted(data.id)) return;
+
+          // Registra o tombstone no cache local (sem empurrar para o Firebase novamente)
+          try {
+            const deleted = JSON.parse(localStorage.getItem(this.DELETED_KEY) || '{}');
+            deleted[data.id] = data.deletedAt || new Date().toISOString();
+            localStorage.setItem(this.DELETED_KEY, JSON.stringify(deleted));
+          } catch(e) { /* silencioso */ }
+
+          // Remove o item de qualquer coleção local onde ele exista
+          Object.values(this.KEYS).forEach(collKey => {
+            if (collKey === this.KEYS.SESSION) return;
+            try {
+              const raw = localStorage.getItem(collKey);
+              if (!raw) return;
+              const list = JSON.parse(raw);
+              if (!Array.isArray(list)) return;
+              if (list.some(item => item && item.id === data.id)) {
+                localStorage.setItem(collKey, JSON.stringify(list.filter(item => item && item.id !== data.id)));
+                localUpdated = true;
+                console.log(`🗑️ [Tombstone sync] Item ${data.id} removido do cache local (${collKey}).`);
+              }
+            } catch(e) { /* silencioso */ }
+          });
+        });
+
+        // Se removeu algo do cache, atualiza a UI (com debounce para não piscar)
+        if (localUpdated) {
+          const isModalOpen = !!document.querySelector('.modal-overlay');
+          if (!isModalOpen && typeof App !== 'undefined' && App.refreshPage) {
+            clearTimeout(this._tombstoneRefreshDebounce);
+            this._tombstoneRefreshDebounce = setTimeout(() => {
+              if (!document.querySelector('.modal-overlay')) App.refreshPage();
+            }, 1000);
+          }
+        }
+      }, err => console.warn('[Tombstone listener] Erro:', err));
+
       // Observa fechamento de modal para aplicar sync pendente
+
       document.addEventListener('click', (e) => {
         if (this._hasPendingSync && !document.querySelector('.modal-overlay')) {
           this._hasPendingSync = false;
@@ -749,11 +805,15 @@ const DataStore = {
     if (!item.id) {
       item.id = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
     }
-    item.criadoEm = new Date().toISOString();
-    item.atualizadoEm = item.criadoEm;
+    // Preserva timestamps pré-definidos pelo chamador; só gera se ausentes
+    if (!item.criadoEm) item.criadoEm = new Date().toISOString();
+    if (!item.atualizadoEm) item.atualizadoEm = item.criadoEm;
     data.push(item);
     // Grava apenas no localStorage localmente; Firebase recebe só o documento novo
-    localStorage.setItem(key, JSON.stringify(data));
+    // CORREÇÃO: aplica compressão para metas, igual ao set() e update(), evitando
+    // inconsistência de formato que pode causar perda de dados no merge inteligente.
+    const toStoreAdd = (key === this.KEYS.METAS) ? this._compressMetaList(data) : data;
+    localStorage.setItem(key, JSON.stringify(toStoreAdd));
 
     if (isFirebaseActive && db && key !== this.KEYS.SESSION) {
       const cleanItem = JSON.parse(JSON.stringify(item));
@@ -776,7 +836,9 @@ const DataStore = {
       // Grava apenas no localStorage — NÃO faz batch de todos os itens no Firebase.
       // O Firebase recebe somente o documento modificado, evitando race conditions
       // entre usuários que estejam salvando simultaneamente.
-      localStorage.setItem(key, JSON.stringify(data));
+      // CORREÇÃO: aplica compressão para metas, igual ao set(), evitando inconsistência.
+      const toStoreUpd = (key === this.KEYS.METAS) ? this._compressMetaList(data) : data;
+      localStorage.setItem(key, JSON.stringify(toStoreUpd));
       
       if (isFirebaseActive && db && key !== this.KEYS.SESSION) {
         const cleanItem = JSON.parse(JSON.stringify(data[idx]));

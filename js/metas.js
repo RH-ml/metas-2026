@@ -225,10 +225,16 @@ const Metas = {
 
     // 2. Filtro de Área Selecionada (this.currentArea)
     if (this.currentArea && this.currentArea !== 'todas' && this.currentArea !== 'all') {
-      // FIX v9b: Pré-carrega objeto da área selecionada para fallback por nome/código.
-      // Browsers diferentes podem ter IDs distintos no localStorage para a mesma área real
-      // (quando uma área foi recriada ou o anti-amnésia manteve um ID antigo).
+      // FIX v9b/v9c: Pré-carrega objeto da área selecionada para fallback por nome/código.
       const _selectedArea = DataStore.getAreaById(this.currentArea);
+
+      // Helper: verifica se duas áreas são a mesma pelo nome + código (ignora IDs diferentes)
+      const _isSameArea = (areaA, areaB) => {
+        if (!areaA || !areaB) return false;
+        const nomeOk = areaA.nome && areaB.nome && areaA.nome.trim() === areaB.nome.trim();
+        const codOk = String(areaA.codigo || '').trim() === String(areaB.codigo || '').trim();
+        return nomeOk && codOk;
+      };
 
       areaMetas = areaMetas.filter(m => {
         // Para metas compartilhadas COM corresponsáveis: verificar se algum corresponsável pertence a esta área
@@ -241,26 +247,32 @@ const Metas = {
           // Continua para verificar areaId e responsavelId abaixo
         }
 
-        // Para todos os tipos: verificar areaId salvo na meta (match exato por ID)
+        // Caminho 1: match exato do areaId salvo na meta com a área selecionada
         if (m.areaId === this.currentArea) {
           return true;
         }
 
-        // Verificar área atual do responsável
+        // Caminho 2: match por nome+código do areaId salvo na meta
+        // Cobre o caso: m.areaId salvo é um ID antigo que ainda existe em mp_areas,
+        // mas this.currentArea tem um ID novo para a mesma área real.
+        if (m.areaId && _selectedArea) {
+          const metaArea = DataStore.getAreaById(m.areaId);
+          if (_isSameArea(metaArea, _selectedArea)) {
+            return true;
+          }
+        }
+
+        // Caminho 3 e 4: verificação pelo responsável
         if (m.responsavelId) {
           const respArea = DataStore.getAreaAtual(m.responsavelId);
           if (respArea) {
-            // Verificação primária: match por ID
+            // Caminho 3: match exato do ID da área do responsável
             if (respArea.id === this.currentArea) {
               return true;
             }
-            // FIX v9b: Fallback por nome + código — cobre o caso em que a área foi
-            // recriada com novo ID (browsers com localStorage antigo mantêm IDs diferentes).
-            // Exige AMBOS nome e código iguais para evitar match acidental entre áreas distintas.
-            if (_selectedArea &&
-                respArea.nome && _selectedArea.nome &&
-                respArea.nome.trim() === _selectedArea.nome.trim() &&
-                String(respArea.codigo || '').trim() === String(_selectedArea.codigo || '').trim()) {
+            // Caminho 4: match por nome+código da área do responsável
+            // Cobre o caso: getAreaAtual retorna área com ID antigo mas mesmo nome/código
+            if (_isSameArea(respArea, _selectedArea)) {
               return true;
             }
           }
@@ -1139,9 +1151,16 @@ const Metas = {
             data.id = data.id + '_' + Date.now().toString(36).substr(-4);
           }
         }
-        const newMeta = DataStore.add(DataStore.KEYS.METAS, data);
-        DataStore.recalcMesesData(newMeta);
-        DataStore.update(DataStore.KEYS.METAS, newMeta.id, newMeta);
+        // CORREÇÃO: executa recalcMesesData ANTES do add() para que o Firebase
+        // receba a meta já completa em uma ÚNICA escrita, eliminando a race condition
+        // que causava o sumiço de metas após atualizar a página.
+        // Antes, add() disparava db.set() com meta sem mesesData, e update() disparava
+        // outro db.set() logo depois — o Firebase processava fora de ordem e a versão
+        // incompleta sobrescrevia a completa.
+        data.criadoEm = new Date().toISOString();
+        data.atualizadoEm = data.criadoEm;
+        DataStore.recalcMesesData(data); // ← recalcula em data antes de persistir
+        const newMeta = DataStore.add(DataStore.KEYS.METAS, data); // ← única escrita no Firebase
         Components.toast('Meta criada com sucesso!', 'success');
       }
       Components.closeModal();
