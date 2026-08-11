@@ -1850,7 +1850,7 @@ const Metas = {
   },
 
   updateAcaoProgress(acaoId, metaId, progresso) {
-    const acao = DataStore.get(DataStore.KEYS.ACOES, acaoId);
+    const acao = DataStore.getById(DataStore.KEYS.ACOES, acaoId);
     if (acao) {
       const newProgress = parseInt(progresso, 10);
       acao.progresso = newProgress;
