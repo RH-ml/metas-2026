@@ -228,27 +228,6 @@ const Metas = {
       // FIX v9b/v9c: Pré-carrega objeto da área selecionada para fallback por nome/código.
       const _selectedArea = DataStore.getAreaById(this.currentArea);
 
-      // FIX hierárquico: coleta TODOS os IDs de sub-áreas da área selecionada (recursivo).
-      // Isso garante que ao filtrar por "Corporativo", metas de responsáveis em sub-áreas
-      // ("Diretoria Comercial", "Gerência Pessoas", etc.) também apareçam no painel.
-      // Sem isso, apenas metas com areaId == currentArea exato seriam visíveis.
-      const _allAreas = DataStore.getAreas();
-      const _getSubAreaIds = (rootId) => {
-        const ids = new Set([rootId]);
-        const queue = [rootId];
-        while (queue.length > 0) {
-          const cur = queue.shift();
-          _allAreas.filter(a => a.parentId === cur).forEach(child => {
-            if (!ids.has(child.id)) {
-              ids.add(child.id);
-              queue.push(child.id);
-            }
-          });
-        }
-        return ids;
-      };
-      const _areaIdSet = _getSubAreaIds(this.currentArea);
-
       // Helper: verifica se duas áreas são a mesma pelo nome + código (ignora IDs diferentes)
       const _isSameArea = (areaA, areaB) => {
         if (!areaA || !areaB) return false;
@@ -258,18 +237,18 @@ const Metas = {
       };
 
       areaMetas = areaMetas.filter(m => {
-        // Para metas compartilhadas COM corresponsáveis: verificar se algum corresponsável pertence a esta área (ou sub-área)
+        // Para metas compartilhadas COM corresponsáveis: verificar se algum corresponsável pertence a esta área
         if (m.tipo === 'compartilhada' && Array.isArray(m.coresponsavelIds) && m.coresponsavelIds.length > 0) {
           const corespMatch = m.coresponsavelIds.some(uid => {
             const uArea = DataStore.getAreaAtual(uid);
-            return uArea && _areaIdSet.has(uArea.id);
+            return uArea && uArea.id === this.currentArea;
           });
           if (corespMatch) return true;
           // Continua para verificar areaId e responsavelId abaixo
         }
 
-        // Caminho 1: match hierárquico do areaId salvo na meta (inclui sub-áreas)
-        if (m.areaId && _areaIdSet.has(m.areaId)) {
+        // Caminho 1: match exato do areaId salvo na meta com a área selecionada
+        if (m.areaId === this.currentArea) {
           return true;
         }
 
@@ -283,12 +262,12 @@ const Metas = {
           }
         }
 
-        // Caminho 3 e 4: verificação pelo responsável (inclui sub-áreas hierarquicamente)
+        // Caminho 3 e 4: verificação pelo responsável
         if (m.responsavelId) {
           const respArea = DataStore.getAreaAtual(m.responsavelId);
           if (respArea) {
-            // Caminho 3: match hierárquico do ID da área do responsável
-            if (_areaIdSet.has(respArea.id)) {
+            // Caminho 3: match exato do ID da área do responsável
+            if (respArea.id === this.currentArea) {
               return true;
             }
             // Caminho 4: match por nome+código da área do responsável
@@ -1172,51 +1151,16 @@ const Metas = {
             data.id = data.id + '_' + Date.now().toString(36).substr(-4);
           }
         }
-
-        // CORREÇÃO v2: inicializa mesesData ANTES de chamar recalcMesesData.
-        // recalcMesesData retorna imediatamente se meta.mesesData não existir,
-        // então a meta ia ao Firebase sem os dados de meses calculados.
-        const mesesNomes = ['Jan/26','Fev/26','Mar/26','Abr/26','Mai/26','Jun/26','Jul/26','Ago/26','Set/26','Out/26','Nov/26','Dez/26'];
-        const valorAlvoPorMes = data.valorAlvo || 0;
-
-        if (data.tipo === 'compartilhada' && data.refMetaId) {
-          // Para metas compartilhadas: inicializa copiando os dados da meta de origem.
-          const sourceMeta = DataStore.getMetas().find(m => String(m.id) === String(data.refMetaId));
-          if (sourceMeta && sourceMeta.mesesData) {
-            data.mesesData = sourceMeta.mesesData.map(sm => ({
-              mes: sm.mes,
-              pontual:  sm.pontual  ? { ...sm.pontual  } : { p: null, r: null, d: null, nota: null, na: false },
-              acumulado: sm.acumulado ? { ...sm.acumulado } : { p: null, r: null, d: null, nota: null },
-              anexos: []
-            }));
-            data.valorAtual = sourceMeta.valorAtual || 0;
-          } else {
-            data.mesesData = mesesNomes.map(mes => ({
-              mes,
-              pontual: { p: valorAlvoPorMes, r: null, d: null, nota: null, na: false },
-              acumulado: { p: valorAlvoPorMes, r: null, d: null, nota: null },
-              anexos: []
-            }));
-          }
-        } else {
-          // Para metas individuais/compostas: inicializa com 12 meses zerados
-          let pAcum = 0;
-          data.mesesData = mesesNomes.map(mes => {
-            let pVal = data.acumulacao === 'soma' ? valorAlvoPorMes / 12 : valorAlvoPorMes;
-            pAcum = data.acumulacao === 'soma' ? pAcum + pVal : (data.acumulacao === 'repetir' ? pVal : pAcum + pVal);
-            return {
-              mes,
-              pontual: { p: pVal, r: null, d: null, nota: null, na: false },
-              acumulado: { p: pAcum, r: null, d: null, nota: null },
-              anexos: []
-            };
-          });
-        }
-
+        // CORREÇÃO: executa recalcMesesData ANTES do add() para que o Firebase
+        // receba a meta já completa em uma ÚNICA escrita, eliminando a race condition
+        // que causava o sumiço de metas após atualizar a página.
+        // Antes, add() disparava db.set() com meta sem mesesData, e update() disparava
+        // outro db.set() logo depois — o Firebase processava fora de ordem e a versão
+        // incompleta sobrescrevia a completa.
         data.criadoEm = new Date().toISOString();
         data.atualizadoEm = data.criadoEm;
-        DataStore.recalcMesesData(data); // agora tem mesesData, o recalc funciona corretamente
-        const newMeta = DataStore.add(DataStore.KEYS.METAS, data); // única escrita no Firebase
+        DataStore.recalcMesesData(data); // ← recalcula em data antes de persistir
+        const newMeta = DataStore.add(DataStore.KEYS.METAS, data); // ← única escrita no Firebase
         Components.toast('Meta criada com sucesso!', 'success');
       }
       Components.closeModal();
