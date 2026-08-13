@@ -1716,8 +1716,11 @@ const Metas = {
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                   <span style="font-size:0.85rem; color:var(--text-1); font-weight:500; word-break:break-all;">📎 ${acao.anexo.nome}</span>
                   <div style="display:flex; gap:6px; flex-shrink:0;">
-                    ${acao.anexo.url ? `<a href="${acao.anexo.url}" target="_blank" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:0.75rem; color:var(--primary); text-decoration:none; background:rgba(46, 134, 77, 0.1);">👁️ Visualizar</a>` : ''}
-                    ${acao.anexo.downloadUrl ? `<a href="${acao.anexo.downloadUrl}" target="_blank" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:0.75rem; color:var(--text-2); text-decoration:none; background:var(--bg-2);">⬇️ Baixar</a>` : (acao.anexo.url ? `<a href="${acao.anexo.url}" download class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:0.75rem; color:var(--text-2); text-decoration:none; background:var(--bg-2);">⬇️ Baixar</a>` : '')}
+                    ${acao.anexo.url
+                      ? `<a href="${acao.anexo.url}" target="_blank" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:0.75rem; color:var(--primary); text-decoration:none; background:rgba(46, 134, 77, 0.1);">👁️ Visualizar</a>
+                         <a href="${acao.anexo.url}" download="${acao.anexo.nome}" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:0.75rem; color:var(--text-2); text-decoration:none; background:var(--bg-2);">⬇️ Baixar</a>`
+                      : `<span title="Arquivo salvo localmente. Substitua o anexo para habilitar visualização." style="padding:4px 8px; font-size:0.75rem; color:var(--text-3); cursor:help;">⚠️ Offline</span>`
+                    }
                     <button type="button" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:0.75rem; color:var(--danger); background:rgba(255, 81, 68, 0.1);" onclick="Metas.deleteAnexoAcao('${acaoId}', '${metaId}')">Excluir</button>
                   </div>
                 </div>
