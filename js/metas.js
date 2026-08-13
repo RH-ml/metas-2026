@@ -1721,11 +1721,11 @@ const Metas = {
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                   <span style="font-size:0.85rem; color:var(--text-1); font-weight:500; word-break:break-all;">📎 ${acao.anexo.nome}</span>
                   <div style="display:flex; gap:6px; flex-shrink:0;">
-                    ${acao.anexo.url
-                       ? `<a href="${acao.anexo.url}" target="_blank" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:0.75rem; color:var(--primary); text-decoration:none; background:rgba(46, 134, 77, 0.1);">👁️ Visualizar</a>
-                          <a href="${acao.anexo.url}" download="${acao.anexo.nome}" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:0.75rem; color:#3b82f6; text-decoration:none; background:rgba(59,130,246,0.1);">⬇️ Baixar</a>`
-                       : `<span title="Arquivo salvo localmente. Substitua o anexo para habilitar visualização e download." style="padding:4px 8px; font-size:0.75rem; color:#f59e0b; cursor:help; display:inline-flex; align-items:center; gap:4px;">⚠️ Salvo offline</span>`
-                    }
+                     ${(acao.anexo.url || acao.anexo.downloadUrl)
+                       ? `${acao.anexo.url ? `<a href="${acao.anexo.url}" target="_blank" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:0.75rem; color:var(--primary); text-decoration:none; background:rgba(46, 134, 77, 0.1);">👁️ Visualizar</a>` : ''}
+                          ${acao.anexo.downloadUrl ? `<a href="${acao.anexo.downloadUrl}" target="_blank" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:0.75rem; color:#3b82f6; text-decoration:none; background:rgba(59,130,246,0.1);">⬇️ Baixar</a>` : acao.anexo.url ? `<a href="${acao.anexo.url}" download="${acao.anexo.nome}" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:0.75rem; color:#3b82f6; text-decoration:none; background:rgba(59,130,246,0.1);">⬇️ Baixar</a>` : ''}`
+                       : `<span title="Arquivo salvo sem link. Substitua o anexo para habilitar visualização." style="padding:4px 8px; font-size:0.75rem; color:#f59e0b; cursor:help; display:inline-flex; align-items:center; gap:4px;">⚠️ Salvo offline</span>`
+                     }
                     <button type="button" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:0.75rem; color:var(--danger); background:rgba(255, 81, 68, 0.1);" onclick="Metas.deleteAnexoAcao('${acaoId}', '${metaId}')">Excluir</button>
                   </div>
                 </div>
@@ -1776,7 +1776,7 @@ const Metas = {
     setTimeout(() => Components.openModal(isEdit ? 'Editar Ação' : 'Nova Ação', content, footer), 350);
   },
 
-  saveAcao(e, metaId, acaoId) {
+  async saveAcao(e, metaId, acaoId) {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(e.target));
     const isEdit = !!acaoId;
@@ -1814,6 +1814,7 @@ const Metas = {
         acao.anexo = {
           nome: fileData.nome,
           url: fileData.url || null,
+          downloadUrl: fileData.downloadUrl || null,
           data: new Date().toISOString(),
           dataHora: new Date().toISOString(),
           usuarioId: session.id,
@@ -1833,24 +1834,48 @@ const Metas = {
     };
 
     if (file) {
-      Components.toast('Subindo anexo da ação para a nuvem...', 'info');
-      if (isFirebaseActive && storage) {
-        const storageRef = storage.ref(`acoes/${targetMetaId}_${Date.now()}_${file.name}`);
-        const uploadTask = storageRef.put(file);
-        uploadTask.on('state_changed', null,
-          (error) => {
-            console.error("Erro no upload do Firebase Storage:", error);
-            Components.toast('Falha ao subir arquivo. Salvando apenas offline.', 'warning');
-            proceedSaveAcao({ nome: file.name, url: null });
-          },
-          () => {
-            uploadTask.snapshot.ref.getDownloadURL().then((downloadURL) => {
-              proceedSaveAcao({ nome: file.name, url: downloadURL });
-            });
-          }
-        );
+      Components.toast('Subindo anexo da ação para o SharePoint...', 'info');
+      if (typeof GraphAPI !== 'undefined') {
+        try {
+          // Determina pasta no SharePoint pela área da meta (mesmo padrão das evidências)
+          const getAcaoFolder = (areaId, responsavelId) => {
+            let codigo = null;
+            if (areaId) {
+              const area = DataStore.getAreaById(areaId);
+              codigo = area && area.codigo ? area.codigo : String(areaId);
+            }
+            if (!codigo && responsavelId) {
+              const respArea = DataStore.getAreaAtual(responsavelId);
+              if (respArea && respArea.codigo) codigo = respArea.codigo;
+            }
+            if (!codigo) return 'Metas_Financeiro';
+            codigo = String(codigo);
+            if (codigo.startsWith('1.1')) return 'Metas_Comercial';
+            if (codigo.startsWith('1.2')) return 'Metas_Engenharia';
+            if (codigo.startsWith('1.3')) return 'Metas_Financeiro';
+            if (codigo.startsWith('1.4')) return 'Metas_Projetos';
+            return 'Metas_Financeiro';
+          };
+
+          const targetMeta = DataStore.getMetaById(targetMetaId);
+          const targetDir = getAcaoFolder(targetMeta?.areaId, targetMeta?.responsavelId);
+          const safeMetaTitle = targetMeta
+            ? (targetMeta.titulo.replace(/[^a-zA-Z0-9 _-]/g, '').trim() || 'PlanoDeAcao')
+            : 'PlanoDeAcao';
+          const subFolder = `${targetDir}/${safeMetaTitle}/PlanoDeAcao`;
+
+          const graphData = await GraphAPI.uploadFile(file.name, file, subFolder);
+          proceedSaveAcao({
+            nome: file.name,
+            url: graphData.webUrl || null,
+            downloadUrl: graphData.downloadUrl || null
+          });
+        } catch (error) {
+          console.error('Erro no upload GraphAPI (ação):', error);
+          Components.toast(`Erro ao subir anexo: ${error.message || 'Tente novamente.'}`, 'error');
+        }
       } else {
-        proceedSaveAcao({ nome: file.name, url: null });
+        Components.toast('Módulo do SharePoint não encontrado. Contate o administrador.', 'error');
       }
     } else {
       proceedSaveAcao(null);
