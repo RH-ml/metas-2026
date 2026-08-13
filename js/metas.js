@@ -555,9 +555,14 @@ const Metas = {
                       ${a.descricao || 'Sem descrição'}
                       ${a.anexo && a.anexo.nome ? `
                         <br>
-                        <div style="margin-top: 4px;">
-                          ${a.anexo.url ? `<a href="${a.anexo.url}" target="_blank" onclick="event.stopPropagation()" style="font-size: 0.7rem; color: var(--success); text-decoration: underline; display: inline-flex; align-items: center; gap: 3px;">📎 ${a.anexo.nome}</a>` : `<span style="font-size: 0.7rem; color: var(--success);">📎 ${a.anexo.nome}</span>`}
-                          ${a.anexo.usuarioNome ? `<span style="font-size: 0.65rem; color: var(--text-3); margin-left: 6px;">por ${a.anexo.usuarioNome} em ${new Date(a.anexo.dataHora || a.anexo.data).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>` : ''}
+                        <div style="margin-top: 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px;">
+                          <span style="font-size: 0.7rem; color: var(--success); display: inline-flex; align-items: center; gap: 3px;">📎 ${a.anexo.nome}</span>
+                          ${a.anexo.url
+                            ? `<a href="${a.anexo.url}" target="_blank" onclick="event.stopPropagation()" class="btn btn-ghost btn-sm" style="padding:2px 7px; font-size:0.7rem; color:var(--primary); text-decoration:none; background:rgba(46, 134, 77, 0.12); border-radius:4px;">👁️ Visualizar</a>
+                               <a href="${a.anexo.url}" download="${a.anexo.nome}" onclick="event.stopPropagation()" class="btn btn-ghost btn-sm" style="padding:2px 7px; font-size:0.7rem; color:var(--text-2); text-decoration:none; background:var(--bg-2); border-radius:4px;">⬇️ Baixar</a>`
+                            : `<span title="Arquivo salvo localmente. Substitua o anexo para habilitar visualização." style="font-size:0.65rem; color:#f59e0b;">⚠️ Offline</span>`
+                          }
+                          ${a.anexo.usuarioNome ? `<span style="font-size:0.65rem; color:var(--text-3);">por ${a.anexo.usuarioNome} em ${new Date(a.anexo.dataHora || a.anexo.data).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>` : ''}
                         </div>
                       ` : ''}
                     </td>
@@ -1717,9 +1722,9 @@ const Metas = {
                   <span style="font-size:0.85rem; color:var(--text-1); font-weight:500; word-break:break-all;">📎 ${acao.anexo.nome}</span>
                   <div style="display:flex; gap:6px; flex-shrink:0;">
                     ${acao.anexo.url
-                      ? `<a href="${acao.anexo.url}" target="_blank" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:0.75rem; color:var(--primary); text-decoration:none; background:rgba(46, 134, 77, 0.1);">👁️ Visualizar</a>
-                         <a href="${acao.anexo.url}" download="${acao.anexo.nome}" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:0.75rem; color:var(--text-2); text-decoration:none; background:var(--bg-2);">⬇️ Baixar</a>`
-                      : `<span title="Arquivo salvo localmente. Substitua o anexo para habilitar visualização." style="padding:4px 8px; font-size:0.75rem; color:var(--text-3); cursor:help;">⚠️ Offline</span>`
+                       ? `<a href="${acao.anexo.url}" target="_blank" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:0.75rem; color:var(--primary); text-decoration:none; background:rgba(46, 134, 77, 0.1);">👁️ Visualizar</a>
+                          <a href="${acao.anexo.url}" download="${acao.anexo.nome}" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:0.75rem; color:#3b82f6; text-decoration:none; background:rgba(59,130,246,0.1);">⬇️ Baixar</a>`
+                       : `<span title="Arquivo salvo localmente. Substitua o anexo para habilitar visualização e download." style="padding:4px 8px; font-size:0.75rem; color:#f59e0b; cursor:help; display:inline-flex; align-items:center; gap:4px;">⚠️ Salvo offline</span>`
                     }
                     <button type="button" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:0.75rem; color:var(--danger); background:rgba(255, 81, 68, 0.1);" onclick="Metas.deleteAnexoAcao('${acaoId}', '${metaId}')">Excluir</button>
                   </div>
