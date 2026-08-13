@@ -853,6 +853,26 @@ const DataStore = {
     }
     return data[idx];
   },
+
+  // Atualiza apenas os campos informados no documento, sem sobrescrever o documento inteiro.
+  // Usa Firebase .update() (merge parcial) em vez de .set() (substituição total).
+  // Ideal para edições concorrentes em campos diferentes do mesmo registro (ex: progresso + anexo).
+  patch(key, id, fields) {
+    const data = this.get(key);
+    const idx = data.findIndex(i => i.id === id);
+    if (idx === -1) return;
+    const now = new Date().toISOString();
+    const patchedFields = { ...fields, atualizadoEm: now };
+    data[idx] = { ...data[idx], ...patchedFields };
+    const toStore = (key === this.KEYS.METAS) ? this._compressMetaList(data) : data;
+    localStorage.setItem(key, JSON.stringify(toStore));
+    if (isFirebaseActive && db && key !== this.KEYS.SESSION) {
+      // .update() altera apenas os campos listados — campos não mencionados ficam intactos
+      db.collection(key).doc(id).update(patchedFields)
+        .catch(e => console.error(`[patch] Erro ao atualizar campos no Firebase (${key}):`, e));
+    }
+    return data[idx];
+  },
  
   remove(key, id) {
     // 1. Registrar tombstone ANTES de qualquer operação (local + Firebase)

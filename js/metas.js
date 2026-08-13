@@ -1886,9 +1886,10 @@ const Metas = {
     const acao = DataStore.getById(DataStore.KEYS.ACOES, acaoId);
     if (acao) {
       const newProgress = parseInt(progresso, 10);
-      acao.progresso = newProgress;
-      acao.atualizadoEm = new Date().toISOString();
-      DataStore.update(DataStore.KEYS.ACOES, acaoId, acao);
+
+      // patch() usa Firebase .update() parcial — só altera o campo 'progresso'
+      // sem sobrescrever 'anexo' ou outros campos editados por outro usuário simultaneamente
+      DataStore.patch(DataStore.KEYS.ACOES, acaoId, { progresso: newProgress });
 
       let statusAuto = 'nao_iniciada';
       if (newProgress === 100) statusAuto = 'concluida';
